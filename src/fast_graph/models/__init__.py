@@ -1,5 +1,6 @@
 from .assistant_models import *
 from .thread_models import *
+from .run_models import *
 
 
 __all__ = [
@@ -9,4 +10,10 @@ __all__ = [
     "ThreadStatus",
     "Thread",
     "ThreadSearchRequest",
+    "Config",
+    "Send",
+    "Command",
+    "CheckpointConfig",
+    "StreamMode",
+    "RunCreateStateful",
 ]
