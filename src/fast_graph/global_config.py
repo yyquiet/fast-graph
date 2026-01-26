@@ -1,11 +1,13 @@
 """全局配置和初始化模块"""
 
-import os
 import logging
 from langgraph.checkpoint.base import BaseCheckpointSaver
+
+from .config import settings
 from .managers import BaseThreadsManager, PostgresThreadsManager
 
 logger = logging.getLogger(__name__)
+
 
 # 全局配置类
 class GlobalConfig:
@@ -17,10 +19,8 @@ class GlobalConfig:
     @classmethod
     async def init(cls):
         """根据环境变量初始化线程管理器"""
-        # 检查是否配置了 PostgreSQL
-        postgre_url = os.getenv('POSTGRE_DATABASE_URL')
 
-        if postgre_url:
+        if settings.postgre_database_url:
             # 使用 PostgreSQL 作为存储后端
             logger.info("使用 PostgreSQL 作为存储后端")
             cls.global_threads_manager = PostgresThreadsManager()

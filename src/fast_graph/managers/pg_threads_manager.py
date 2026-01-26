@@ -17,6 +17,7 @@ from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 from sqlalchemy.orm import declarative_base
 
+from ..config import settings
 from .base_threads_manager import BaseThreadsManager
 from ..models import Thread, ThreadStatus
 from ..errors import ResourceExistsError, ResourceNotFoundError
@@ -62,7 +63,7 @@ class PostgresThreadsManager(BaseThreadsManager):
     def __init__(self):
         """初始化 PostgreSQL 连接池"""
         # 从环境变量读取数据库连接 URL
-        db_url = os.getenv('POSTGRE_DATABASE_URL')
+        db_url = settings.postgre_database_url
         if not db_url:
             raise ValueError("POSTGRE_DATABASE_URL environment variable is required")
 
@@ -75,10 +76,10 @@ class PostgresThreadsManager(BaseThreadsManager):
         # 创建异步引擎和连接池
         self.engine = create_async_engine(
             db_url,
-            pool_size=int(os.getenv('POSTGRE_DB_POOL_SIZE', '10')),
-            max_overflow=int(os.getenv('POSTGRE_DB_MAX_OVERFLOW', '20')),
+            pool_size=settings.postgre_db_pool_size,
+            max_overflow=settings.postgre_db_max_overflow,
             pool_pre_ping=True,  # 使用前验证连接
-            echo=os.getenv('POSTGRE_DB_ECHO', 'false').lower() == 'true',
+            echo=settings.postgre_db_echo,
         )
 
         # 创建会话工厂
