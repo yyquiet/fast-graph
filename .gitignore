@@ -9,5 +9,8 @@ wheels/
 # Virtual environments
 .venv
 
+# IDE
+.kiro/
+
 # Others
 TODO.md
