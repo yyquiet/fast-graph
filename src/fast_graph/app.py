@@ -6,6 +6,7 @@ from pydantic import ValidationError as PydanticValidationError
 
 from .api import api_router
 from .errors import ValidationError, ResourceNotFoundError
+from .global_config import GlobalConfig
 
 
 logger = logging.getLogger(__name__)
@@ -14,6 +15,7 @@ logger = logging.getLogger(__name__)
 async def lifespan(app: FastAPI):
     logger.info("应用启动")
 
+    await GlobalConfig.init_global()
     yield
 
     logger.info("应用关闭")

@@ -9,4 +9,7 @@ dependencies = [
     "langchain>=1.2.7",
     "langgraph>=1.0.7",
     "uvicorn>=0.40.0",
+    "sqlalchemy>=2.0.0",
+    "asyncpg>=0.29.0",
+    "greenlet>=3.3.1",
 ]
