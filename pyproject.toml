@@ -1,0 +1,9 @@
+[project]
+name = "fast-graph"
+version = "0.1.0"
+description = "fast langgraph server"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.128.0",
+]
