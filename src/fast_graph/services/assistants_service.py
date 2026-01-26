@@ -3,7 +3,7 @@ from langchain_core.runnables.graph import Graph
 import threading
 
 from ..graph.registry import get_graph, GRAPHS
-from ..model import Assistant, AssistantSearchRequest
+from ..models import Assistant, AssistantSearchRequest
 
 
 class AssistantsService:

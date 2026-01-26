@@ -1,7 +1,7 @@
 from typing import List, Optional
 import threading
 
-from ..model import (
+from ..models import (
     Thread,
     ThreadCreate,
     ThreadSearchRequest,

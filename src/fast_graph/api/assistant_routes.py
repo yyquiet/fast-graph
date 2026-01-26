@@ -1,11 +1,11 @@
 from typing import List, Dict, Any, Union
 from fastapi import APIRouter, Path, Query, Depends
 
-from ..model import (
+from ..models import (
     Assistant,
     AssistantSearchRequest,
 )
-from ..service import AssistantsService
+from ..services import AssistantsService
 
 router = APIRouter(
     prefix="/assistants",

@@ -18,7 +18,7 @@ from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sess
 from sqlalchemy.orm import declarative_base
 
 from .base_threads_manager import BaseThreadsManager
-from ..model import Thread, ThreadStatus
+from ..models import Thread, ThreadStatus
 from ..errors import ResourceExistsError, ResourceNotFoundError
 
 Base = declarative_base()

@@ -8,7 +8,7 @@
 from abc import ABC, abstractmethod
 from typing import Optional, List, Dict, Any
 
-from ..model import Thread, ThreadStatus
+from ..models import Thread, ThreadStatus
 
 class BaseThreadsManager(ABC):
     """

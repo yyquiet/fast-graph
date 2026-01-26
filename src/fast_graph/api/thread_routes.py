@@ -1,12 +1,12 @@
 from typing import List
 from fastapi import APIRouter, Path, Depends
 
-from ..model import (
+from ..models import (
     Thread,
     ThreadCreate,
     ThreadSearchRequest,
 )
-from ..service import ThreadsService
+from ..services import ThreadsService
 
 router = APIRouter(
     prefix="/threads",

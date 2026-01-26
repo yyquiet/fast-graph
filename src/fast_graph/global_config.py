@@ -3,8 +3,7 @@
 import os
 import logging
 from langgraph.checkpoint.base import BaseCheckpointSaver
-from .manager import BaseThreadsManager
-from .manager.pg_threads_manager import PostgresThreadsManager
+from .managers import BaseThreadsManager, PostgresThreadsManager
 
 logger = logging.getLogger(__name__)
 
