@@ -34,6 +34,35 @@ class Settings(BaseSettings):
         description="是否打印 SQL 语句"
     )
 
+    # redis配置
+    redis_host: str = Field(
+        default="",
+        description="Redis 主机地址"
+    )
+    redis_port: int = Field(
+        default=6379,
+        description="Redis 端口号"
+    )
+    redis_username: str = Field(
+        default="",
+        description="Redis 用户"
+    )
+    redis_password: str = Field(
+        default="",
+        description="Redis 密码"
+    )
+    redis_db: int = Field(
+        default=0,
+        description="Redis 数据库号"
+    )
+    redis_max_connections: int = Field(
+        default=20,
+        description="Redis 最大连接数"
+    )
+    redis_key_pre: str = Field(
+        default="fast-graph",
+        description="Redis key 前缀"
+    )
 
 # 创建全局配置实例
 settings = Settings()

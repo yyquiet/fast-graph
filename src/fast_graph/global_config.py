@@ -4,7 +4,7 @@ import logging
 from langgraph.checkpoint.base import BaseCheckpointSaver
 
 from .config import settings
-from .managers import BaseThreadsManager, PostgresThreadsManager
+from .managers import BaseThreadsManager, PostgresThreadsManager, StreamQueueManager, RedisStreamQueue
 
 logger = logging.getLogger(__name__)
 
@@ -13,6 +13,7 @@ logger = logging.getLogger(__name__)
 class GlobalConfig:
     """全局配置管理"""
     global_threads_manager: BaseThreadsManager
+    global_queue_manager: StreamQueueManager
     global_checkpointer: BaseCheckpointSaver
     is_initialized: bool = False
 
@@ -32,6 +33,15 @@ class GlobalConfig:
             raise ValueError(
                 "未配置存储后端。请设置以下环境变量之一：\n"
                 "  - POSTGRE_DATABASE_URL: PostgreSQL 数据库连接 URL"
+            )
+
+        if settings.redis_host:
+            logger.info("使用 Redis 作为消息队列")
+            cls.global_queue_manager = StreamQueueManager(RedisStreamQueue)
+        else:
+            raise ValueError(
+                "未配置消息队列。请设置以下环境变量之一：\n"
+                "  - REDIS_HOST: Redis 服务器地址"
             )
 
     @classmethod
