@@ -1,4 +1,3 @@
-import os
 import uuid
 from datetime import datetime
 from typing import Optional, List, Dict, Any
@@ -14,15 +13,11 @@ from sqlalchemy import (
     and_,
 )
 from sqlalchemy.dialects.postgresql import JSONB
-from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
-from sqlalchemy.orm import declarative_base
 
-from ..config import settings
 from .base_threads_manager import BaseThreadsManager
+from .pg_connection import Base, get_pg_connection
 from ..models import Thread, ThreadStatus
 from ..errors import ResourceExistsError, ResourceNotFoundError
-
-Base = declarative_base()
 
 
 class ThreadModel(Base):
@@ -61,40 +56,14 @@ class PostgresThreadsManager(BaseThreadsManager):
     """
 
     def __init__(self):
-        """初始化 PostgreSQL 连接池"""
-        # 从环境变量读取数据库连接 URL
-        db_url = settings.postgre_database_url
-        if not db_url:
-            raise ValueError("POSTGRE_DATABASE_URL environment variable is required")
-
-        # 转换为异步 URL
-        if db_url.startswith('postgresql://'):
-            db_url = db_url.replace('postgresql://', 'postgresql+asyncpg://', 1)
-        elif not db_url.startswith('postgresql+asyncpg://'):
-            raise ValueError("POSTGRE_DATABASE_URL must use postgresql:// or postgresql+asyncpg:// scheme")
-
-        # 创建异步引擎和连接池
-        self.engine = create_async_engine(
-            db_url,
-            pool_size=settings.postgre_db_pool_size,
-            max_overflow=settings.postgre_db_max_overflow,
-            pool_pre_ping=True,  # 使用前验证连接
-            echo=settings.postgre_db_echo,
-        )
-
-        # 创建会话工厂
-        self.async_session = async_sessionmaker(
-            self.engine,
-            class_=AsyncSession,
-            expire_on_commit=False,
-        )
+        """初始化 PostgreSQL 线程管理器"""
+        # 获取全局 PostgreSQL 连接
+        self._pg_conn = get_pg_connection()
+        self.async_session = self._pg_conn.async_session
 
     async def setup(self) -> None:
         """初始化数据库表"""
-        async with self.engine.begin() as conn:
-            # create_all 会自动检查表是否存在（checkfirst=True 是默认值）
-            # 如果表已存在，会跳过创建，不会报错也不会影响数据
-            await conn.run_sync(Base.metadata.create_all)
+        await self._pg_conn.init_tables()
 
     @staticmethod
     def _to_thread(model: ThreadModel) -> Thread:

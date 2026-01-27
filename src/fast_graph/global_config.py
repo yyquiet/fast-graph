@@ -1,11 +1,16 @@
 """全局配置和初始化模块"""
 
 import logging
-from langgraph.checkpoint.base import BaseCheckpointSaver
 
 from .config import settings
-from .managers import BaseThreadsManager, PostgresThreadsManager, StreamQueueManager, RedisStreamQueue
-
+from .managers import (
+    BaseThreadsManager,
+    PostgresThreadsManager,
+    StreamQueueManager,
+    RedisStreamQueue,
+    BaseCheckpointerManager,
+    PostgresCheckpointerManager,
+)
 logger = logging.getLogger(__name__)
 
 
@@ -14,7 +19,7 @@ class GlobalConfig:
     """全局配置管理"""
     global_threads_manager: BaseThreadsManager
     global_queue_manager: StreamQueueManager
-    global_checkpointer: BaseCheckpointSaver
+    global_checkpointer_manager: BaseCheckpointerManager
     is_initialized: bool = False
 
     @classmethod
@@ -28,6 +33,9 @@ class GlobalConfig:
             # 初始化数据库表
             logger.info("初始化数据库表")
             await cls.global_threads_manager.setup()
+
+            cls.global_checkpointer_manager = PostgresCheckpointerManager()
+            await cls.global_checkpointer_manager.init()
         else:
             # 没有配置任何存储后端，抛出错误
             raise ValueError(
