@@ -4,6 +4,8 @@ import threading
 from ..models import (
     RunCreateStateful,
 )
+from ..graph.executor import GraphExecutor
+from ..global_config import GlobalConfig
 
 
 class RunsService:
@@ -23,7 +25,7 @@ class RunsService:
 
     def _initialize(self):
         """初始化 runs（只执行一次）"""
-        pass
+        self.executor = GraphExecutor(GlobalConfig.global_threads_manager)
 
 
     async def create_run_stream(

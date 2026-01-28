@@ -25,17 +25,14 @@ class GraphExecutor:
     def __init__(
         self,
         thread_manager: BaseThreadsManager,
-        checkpointer_manager: BaseCheckpointerManager,
     ):
         """
         初始化图执行器
 
         Args:
             thread_manager: 线程管理器，用于更新线程状态
-            checkpointer_manager: Checkpointer 管理器，用于获取图的 checkpointer
         """
         self.thread_manager = thread_manager
-        self.checkpointer_manager = checkpointer_manager
 
     async def stream_graph(
         self,

@@ -53,7 +53,7 @@ async def executor(
     checkpointer_manager: MemoryCheckpointerManager
 ) -> GraphExecutor:
     """执行器 fixture"""
-    return GraphExecutor(thread_manager, checkpointer_manager)
+    return GraphExecutor(thread_manager)
 
 
 @pytest.fixture
@@ -75,7 +75,6 @@ class TestGraphExecutor:
     async def test_initialization(self, executor: GraphExecutor):
         """测试执行器初始化"""
         assert executor.thread_manager is not None
-        assert executor.checkpointer_manager is not None
 
     @pytest.mark.asyncio
     async def test_normalize_stream_mode_none(self, executor: GraphExecutor):
