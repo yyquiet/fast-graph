@@ -268,11 +268,10 @@ class TestGraphExecutor:
 
         # 发送中断事件
         event = ("updates", {"__interrupt__": [{"value": "interrupt_data"}]})
-        await executor._handle_event(event, queue, "test_thread")
+        thread_interrupted = await executor._handle_event(event, queue, "test_thread")
 
-        # 验证线程状态已更新为中断
-        updated_thread = await thread_manager.get("test_thread")
-        assert updated_thread.status == ThreadStatus.interrupted
+        # 验证返回值表示检测到中断
+        assert thread_interrupted is True
 
         # 验证事件已推送
         messages = await queue.get_all()
@@ -289,7 +288,7 @@ class TestGraphExecutor:
         thread = await thread_manager.create(thread_id="test_thread")
         await thread_manager.update("test_thread", {"status": ThreadStatus.busy})
 
-        await executor._finalize_execution("test_thread", queue)
+        await executor._finalize_execution("test_thread", False, queue)
 
         # 验证推送了成功结束事件
         messages = await queue.get_all()
@@ -312,7 +311,7 @@ class TestGraphExecutor:
         thread = await thread_manager.create(thread_id="test_thread")
         await thread_manager.update("test_thread", {"status": ThreadStatus.interrupted})
 
-        await executor._finalize_execution("test_thread", queue)
+        await executor._finalize_execution("test_thread", True, queue)
 
         # 验证推送了中断结束事件
         messages = await queue.get_all()
@@ -583,12 +582,12 @@ class TestGraphExecutorEdgeCases:
         event1 = ("updates", {"__interrupt__": [{"value": "interrupt1"}]})
         event2 = ("updates", {"__interrupt__": [{"value": "interrupt2"}]})
 
-        await executor._handle_event(event1, queue, "test_thread")
-        await executor._handle_event(event2, queue, "test_thread")
+        interrupted1 = await executor._handle_event(event1, queue, "test_thread")
+        interrupted2 = await executor._handle_event(event2, queue, "test_thread")
 
-        # 验证状态仍然是中断
-        updated_thread = await thread_manager.get("test_thread")
-        assert updated_thread.status == ThreadStatus.interrupted
+        # 验证两次都检测到中断
+        assert interrupted1 is True
+        assert interrupted2 is True
 
         # 验证两个事件都被推送
         messages = await queue.get_all()

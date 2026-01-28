@@ -76,6 +76,7 @@ class GraphExecutor:
             graph_input = self._prepare_input(payload)
 
             # 执行图并流式传输事件
+            thread_interrupted = False
             async for event in graph.astream(
                 graph_input,
                 config=config,  # type: ignore
@@ -85,10 +86,11 @@ class GraphExecutor:
                 subgraphs=payload.stream_subgraphs or False,
                 context=payload.context  # type: ignore
             ):
-                await self._handle_event(event, queue, thread_id)
+                if await self._handle_event(event, queue, thread_id):
+                    thread_interrupted = True
 
             # 检查执行结果并更新状态
-            await self._finalize_execution(thread_id, queue)
+            await self._finalize_execution(thread_id, thread_interrupted, queue)
 
         except Exception as e:
             # 处理错误
@@ -213,7 +215,7 @@ class GraphExecutor:
         event: Any,
         queue: BaseStreamQueue,
         thread_id: str,
-    ) -> None:
+    ) -> bool:
         """
         处理图执行事件
 
@@ -221,7 +223,12 @@ class GraphExecutor:
             event: 图执行产生的事件
             queue: 事件队列
             thread_id: 线程 ID
+
+        Returns:
+            是否检测到中断事件
         """
+        thread_interrupted = False
+
         # 解析事件格式
         namespace = None
         event_type = "values"  # 默认类型
@@ -238,11 +245,7 @@ class GraphExecutor:
 
         # 检查是否是中断事件
         if isinstance(event_data, dict) and "__interrupt__" in event_data:
-            # 中断事件，更新线程状态为中断
-            await self.thread_manager.update(
-                thread_id,
-                {"status": ThreadStatus.interrupted}
-            )
+            thread_interrupted = True
 
         # 构建事件消息数据
         if namespace is not None:
@@ -261,9 +264,12 @@ class GraphExecutor:
             data=message_data
         ))
 
+        return thread_interrupted
+
     async def _finalize_execution(
         self,
         thread_id: str,
+        thread_interrupted: bool,
         queue: BaseStreamQueue
     ) -> None:
         """
@@ -271,23 +277,27 @@ class GraphExecutor:
 
         Args:
             thread_id: 线程 ID
+            thread_interrupted: 是否检测到中断事件
             queue: 事件队列
         """
-        # 获取当前线程状态
-        thread = await self.thread_manager.get(thread_id)
-
-        if thread.status == ThreadStatus.interrupted:
+        if thread_interrupted:
             # 执行被中断
             await queue.push(EventMessage(
                 event="__stream_end__",
                 data={"status": "interrupted"}
             ))
+            # 更新线程状态为中断
+            await self.thread_manager.update(
+                thread_id,
+                {"status": ThreadStatus.interrupted}
+            )
         else:
             # 执行成功完成
             await queue.push(EventMessage(
                 event="__stream_end__",
                 data={"status": "success"}
             ))
+            # 更新线程状态为空闲
             await self.thread_manager.update(
                 thread_id,
                 {"status": ThreadStatus.idle}
