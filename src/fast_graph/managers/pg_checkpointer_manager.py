@@ -4,6 +4,7 @@ from typing import Optional, TYPE_CHECKING
 from psycopg_pool import AsyncConnectionPool
 from psycopg.rows import dict_row
 from langgraph.checkpoint.base import BaseCheckpointSaver
+from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 
 if TYPE_CHECKING:
     from psycopg import AsyncConnection
