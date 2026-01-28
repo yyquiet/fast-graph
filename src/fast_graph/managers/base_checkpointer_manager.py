@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from langgraph.checkpoint.postgres.base import BasePostgresSaver
+from langgraph.checkpoint.base import BaseCheckpointSaver
 
 class BaseCheckpointerManager(ABC):
     """
@@ -7,7 +7,7 @@ class BaseCheckpointerManager(ABC):
     """
 
     @abstractmethod
-    def get_checkpointer(self) -> BasePostgresSaver:
+    def get_checkpointer(self) -> BaseCheckpointSaver:
         """
         获取 Checkpointer 实例
         """

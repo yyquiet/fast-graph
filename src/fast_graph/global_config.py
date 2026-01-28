@@ -6,10 +6,13 @@ from .config import settings
 from .managers import (
     BaseThreadsManager,
     PostgresThreadsManager,
+    MemoryThreadsManager,
     StreamQueueManager,
     RedisStreamQueue,
+    MemoryStreamQueue,
     BaseCheckpointerManager,
     PostgresCheckpointerManager,
+    MemoryCheckpointerManager,
 )
 logger = logging.getLogger(__name__)
 
@@ -37,20 +40,16 @@ class GlobalConfig:
             cls.global_checkpointer_manager = PostgresCheckpointerManager()
             await cls.global_checkpointer_manager.init()
         else:
-            # 没有配置任何存储后端，抛出错误
-            raise ValueError(
-                "未配置存储后端。请设置以下环境变量之一：\n"
-                "  - POSTGRE_DATABASE_URL: PostgreSQL 数据库连接 URL"
-            )
+            logger.warning("！！！使用 内存 作为存储后端！！！")
+            cls.global_threads_manager = MemoryThreadsManager()
+            cls.global_checkpointer_manager = MemoryCheckpointerManager()
 
         if settings.redis_host:
             logger.info("使用 Redis 作为消息队列")
             cls.global_queue_manager = StreamQueueManager(RedisStreamQueue)
         else:
-            raise ValueError(
-                "未配置消息队列。请设置以下环境变量之一：\n"
-                "  - REDIS_HOST: Redis 服务器地址"
-            )
+            logger.warning("！！！使用 内存 作为消息队列！！！")
+            cls.global_queue_manager = StreamQueueManager(MemoryStreamQueue)
 
     @classmethod
     async def init_global(cls) -> None:

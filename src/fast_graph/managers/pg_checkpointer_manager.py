@@ -3,7 +3,7 @@ from typing import Optional, TYPE_CHECKING
 
 from psycopg_pool import AsyncConnectionPool
 from psycopg.rows import dict_row
-from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
+from langgraph.checkpoint.base import BaseCheckpointSaver
 
 if TYPE_CHECKING:
     from psycopg import AsyncConnection
@@ -43,7 +43,7 @@ class PostgresCheckpointerManager(BaseCheckpointerManager):
             await self.psycopg_pool.close()
             self.psycopg_pool = None
 
-    def get_checkpointer(self) -> AsyncPostgresSaver:
+    def get_checkpointer(self) -> BaseCheckpointSaver:
         """
         获取 Checkpointer 实例
 
