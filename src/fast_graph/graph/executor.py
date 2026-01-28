@@ -240,7 +240,7 @@ class GraphExecutor:
         # else: 单值事件，使用默认的 event_type="values", event_data=event
 
         # 检查是否是中断事件
-        if event_type == "updates" and isinstance(event_data, dict) and "__interrupt__" in event_data:
+        if isinstance(event_data, dict) and "__interrupt__" in event_data:
             # 中断事件，更新线程状态为中断
             await self.thread_manager.update(
                 thread_id,

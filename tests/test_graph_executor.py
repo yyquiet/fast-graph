@@ -23,6 +23,12 @@ from src.fast_graph.models import (
     CheckpointConfig,
     Config,
 )
+from graph_demo.graph import (
+    create_full_graph,
+    create_hitl_graph,
+    create_error_graph,
+    create_normal_graph,
+)
 
 
 @pytest.fixture
@@ -344,122 +350,119 @@ class TestGraphExecutor:
         self,
         executor: GraphExecutor,
         queue: MemoryStreamQueue,
-        thread_manager: MemoryThreadsManager
+        thread_manager: MemoryThreadsManager,
+        checkpointer_manager: MemoryCheckpointerManager
     ):
         """测试成功执行图流"""
         thread = await thread_manager.create(thread_id="test_thread")
 
-        # 创建模拟图
-        mock_graph = AsyncMock()
+        # 使用实际的普通图（不会抛异常，不会中断）
+        graph = create_normal_graph()
 
-        # 模拟 astream 返回事件流
-        async def mock_astream(*args, **kwargs):
-            yield ("values", {"state": "step1"})
-            yield ("values", {"state": "step2"})
-
-        mock_graph.astream = mock_astream
+        # 为图配置 checkpointer
+        graph.checkpointer = checkpointer_manager.get_checkpointer()
 
         # 创建 payload
         payload = RunCreateStateful(  # type: ignore
             assistant_id="test_assistant",
-            input={"message": "hello"}
+            input={"content": "", "auto_accepted": True, "not_throw_error": True}
         )
 
         # 执行
-        await executor.stream_graph(mock_graph, payload, queue, "test_thread")
+        await executor.stream_graph(graph, payload, queue, "test_thread")
 
         # 验证推送了元数据、事件和结束事件
         messages = await queue.get_all()
         assert len(messages) >= 3
         assert messages[0].event == "metadata"
         assert messages[-1].event == "__stream_end__"
+        assert messages[-1].data["status"] == "success"
 
     @pytest.mark.asyncio
     async def test_stream_graph_with_error(
         self,
         executor: GraphExecutor,
         queue: MemoryStreamQueue,
-        thread_manager: MemoryThreadsManager
+        thread_manager: MemoryThreadsManager,
+        checkpointer_manager: MemoryCheckpointerManager
     ):
         """测试执行图时发生错误"""
         thread = await thread_manager.create(thread_id="test_thread")
 
-        # 创建会抛出异常的模拟图
-        mock_graph = AsyncMock()
+        # 使用实际的错误图（会抛出 RuntimeError）
+        graph = create_error_graph()
 
-        async def mock_astream_error(*args, **kwargs):
-            yield ("values", {"state": "step1"})
-            raise RuntimeError("Graph execution failed")
-
-        mock_graph.astream = mock_astream_error
+        # 为图配置 checkpointer
+        graph.checkpointer = checkpointer_manager.get_checkpointer()
 
         payload = RunCreateStateful(  # type: ignore
             assistant_id="test_assistant",
-            input={"message": "hello"}
+            input={"content": "", "not_throw_error": False}  # 不抑制错误
         )
 
         # 执行应该抛出异常
-        with pytest.raises(RuntimeError):
-            await executor.stream_graph(mock_graph, payload, queue, "test_thread")
+        with pytest.raises(RuntimeError, match="throw_error"):
+            await executor.stream_graph(graph, payload, queue, "test_thread")
 
         # 验证推送了错误事件
         messages = await queue.get_all()
         error_events = [msg for msg in messages if msg.event == "__stream_error__"]
         assert len(error_events) == 1
-        assert "Graph execution failed" in error_events[0].data["error"]
+        assert "throw_error" in error_events[0].data["error"]
 
     @pytest.mark.asyncio
     async def test_stream_graph_with_context(
         self,
         executor: GraphExecutor,
         queue: MemoryStreamQueue,
-        thread_manager: MemoryThreadsManager
+        thread_manager: MemoryThreadsManager,
+        checkpointer_manager: MemoryCheckpointerManager
     ):
         """测试带 context 的图执行"""
         thread = await thread_manager.create(thread_id="test_thread")
 
-        mock_graph = AsyncMock()
+        # 使用实际的普通图
+        graph = create_normal_graph()
 
-        async def mock_astream(*args, **kwargs):
-            # 验证 context 参数被传递
-            assert "context" in kwargs
-            assert kwargs["context"] == {"user_id": "123"}
-            yield ("values", {"state": "done"})
-
-        mock_graph.astream = mock_astream
+        # 为图配置 checkpointer
+        graph.checkpointer = checkpointer_manager.get_checkpointer()
 
         payload = RunCreateStateful(  # type: ignore
             assistant_id="test_assistant",
-            input={"message": "hello"},
+            input={"content": "", "auto_accepted": True, "not_throw_error": True},
             context={"user_id": "123"}
         )
 
-        await executor.stream_graph(mock_graph, payload, queue, "test_thread")
+        await executor.stream_graph(graph, payload, queue, "test_thread")
+
+        # 验证执行成功
+        messages = await queue.get_all()
+        assert len(messages) >= 2
+        assert messages[-1].event == "__stream_end__"
 
     @pytest.mark.asyncio
     async def test_stream_graph_with_interrupt(
         self,
         executor: GraphExecutor,
         queue: MemoryStreamQueue,
-        thread_manager: MemoryThreadsManager
+        thread_manager: MemoryThreadsManager,
+        checkpointer_manager: MemoryCheckpointerManager
     ):
         """测试带中断的图执行"""
         thread = await thread_manager.create(thread_id="test_thread")
 
-        mock_graph = AsyncMock()
+        # 使用实际的 HITL 图（会中断等待人工审批）
+        graph = create_hitl_graph()
 
-        async def mock_astream(*args, **kwargs):
-            yield ("values", {"state": "step1"})
-            yield ("updates", {"__interrupt__": [{"value": "waiting"}]})
-
-        mock_graph.astream = mock_astream
+        # 为图配置 checkpointer
+        graph.checkpointer = checkpointer_manager.get_checkpointer()
 
         payload = RunCreateStateful(  # type: ignore
             assistant_id="test_assistant",
-            input={"message": "hello"}
+            input={"content": "", "auto_accepted": False}  # 不自动接受，会触发中断
         )
 
-        await executor.stream_graph(mock_graph, payload, queue, "test_thread")
+        await executor.stream_graph(graph, payload, queue, "test_thread")
 
         # 验证线程状态为中断
         updated_thread = await thread_manager.get("test_thread")
@@ -476,37 +479,30 @@ class TestGraphExecutor:
         self,
         executor: GraphExecutor,
         queue: MemoryStreamQueue,
-        thread_manager: MemoryThreadsManager
+        thread_manager: MemoryThreadsManager,
+        checkpointer_manager: MemoryCheckpointerManager
     ):
         """测试带子图的图执行"""
         thread = await thread_manager.create(thread_id="test_thread")
 
-        mock_graph = AsyncMock()
+        # 使用实际的完整图
+        graph = create_full_graph()
 
-        async def mock_astream(*args, **kwargs):
-            # 验证 subgraphs 参数
-            assert kwargs.get("subgraphs") is True
-            # 返回三元组格式（带 namespace）
-            yield ("subgraph_1", "values", {"state": "sub_step"})
-            yield ("values", {"state": "main_step"})
-
-        mock_graph.astream = mock_astream
+        # 为图配置 checkpointer
+        graph.checkpointer = checkpointer_manager.get_checkpointer()
 
         payload = RunCreateStateful(  # type: ignore
             assistant_id="test_assistant",
-            input={"message": "hello"},
+            input={"content": "", "auto_accepted": True, "not_throw_error": True},
             stream_subgraphs=True
         )
 
-        await executor.stream_graph(mock_graph, payload, queue, "test_thread")
+        await executor.stream_graph(graph, payload, queue, "test_thread")
 
-        # 验证处理了带 namespace 的事件
+        # 验证执行成功
         messages = await queue.get_all()
-        namespace_events = [
-            msg for msg in messages
-            if isinstance(msg.data, dict) and "namespace" in msg.data
-        ]
-        assert len(namespace_events) >= 1
+        assert len(messages) >= 2
+        assert messages[-1].event == "__stream_end__"
 
 
 class TestGraphExecutorEdgeCases:
@@ -598,3 +594,227 @@ class TestGraphExecutorEdgeCases:
         # 验证两个事件都被推送
         messages = await queue.get_all()
         assert len(messages) == 2
+
+
+class TestGraphExecutorResume:
+    """GraphExecutor 恢复执行测试"""
+
+    @pytest.mark.asyncio
+    async def test_resume_after_interrupt(
+        self,
+        executor: GraphExecutor,
+        thread_manager: MemoryThreadsManager,
+        checkpointer_manager: MemoryCheckpointerManager
+    ):
+        """测试中断后恢复执行"""
+        thread = await thread_manager.create(thread_id="test_thread_resume")
+
+        # 第一步：执行图直到中断
+        graph = create_hitl_graph()
+        # 直接设置 checkpointer
+        graph.checkpointer = checkpointer_manager.get_checkpointer()
+
+        queue1 = MemoryStreamQueue("queue1")
+        payload1 = RunCreateStateful(  # type: ignore
+            assistant_id="test_assistant",
+            input={"content": "start", "auto_accepted": False}  # 会触发中断
+        )
+
+        await executor.stream_graph(graph, payload1, queue1, "test_thread_resume")
+
+        # 验证线程状态为中断
+        thread_after_interrupt = await thread_manager.get("test_thread_resume")
+        assert thread_after_interrupt.status == ThreadStatus.interrupted
+
+        messages1 = await queue1.get_all()
+        end_events1 = [msg for msg in messages1 if msg.event == "__stream_end__"]
+        assert len(end_events1) == 1
+        assert end_events1[0].data["status"] == "interrupted"
+
+        # 第二步：使用 Command 恢复执行
+        queue2 = MemoryStreamQueue("queue2")
+        payload2 = RunCreateStateful(  # type: ignore
+            assistant_id="test_assistant",
+            command=Command(  # type: ignore
+                resume="[APPROVED]"  # 提供审批结果
+            )
+        )
+
+        await executor.stream_graph(graph, payload2, queue2, "test_thread_resume")
+
+        # 验证线程状态恢复为 idle（执行完成）
+        thread_after_resume = await thread_manager.get("test_thread_resume")
+        assert thread_after_resume.status == ThreadStatus.idle
+
+        messages2 = await queue2.get_all()
+        end_events2 = [msg for msg in messages2 if msg.event == "__stream_end__"]
+        assert len(end_events2) == 1
+        assert end_events2[0].data["status"] == "success"
+
+        # 验证内容包含审批结果
+        value_events = [msg for msg in messages2 if msg.event == "values"]
+        assert len(value_events) > 0
+        # 最后一个 values 事件应该包含完整的执行结果
+        final_state = value_events[-1].data
+        assert "[APPROVED]" in final_state.get("content", "")
+
+    @pytest.mark.asyncio
+    async def test_resume_after_error_with_update(
+        self,
+        executor: GraphExecutor,
+        thread_manager: MemoryThreadsManager,
+        checkpointer_manager: MemoryCheckpointerManager
+    ):
+        """测试异常后使用 Command.update 修复状态并恢复执行"""
+        thread = await thread_manager.create(thread_id="test_thread_error")
+
+        # 第一步：执行会抛出异常的图
+        graph = create_error_graph()
+        # 直接设置 checkpointer
+        graph.checkpointer = checkpointer_manager.get_checkpointer()
+
+        queue1 = MemoryStreamQueue("queue1")
+        payload1 = RunCreateStateful(  # type: ignore
+            assistant_id="test_assistant",
+            input={"content": "start", "not_throw_error": False}  # 会抛出异常
+        )
+
+        # 执行应该抛出异常
+        with pytest.raises(RuntimeError, match="throw_error"):
+            await executor.stream_graph(graph, payload1, queue1, "test_thread_error")
+
+        # 验证线程状态为 error
+        thread_after_error = await thread_manager.get("test_thread_error")
+        assert thread_after_error.status == ThreadStatus.error
+
+        # 第二步：使用 Command.update 修复状态并恢复
+        queue2 = MemoryStreamQueue("queue2")
+        payload2 = RunCreateStateful(  # type: ignore
+            assistant_id="test_assistant",
+            command=Command(  # type: ignore
+                update={"not_throw_error": True}  # 修复状态，不再抛异常
+            )
+        )
+
+        await executor.stream_graph(graph, payload2, queue2, "test_thread_error")
+
+        # 验证线程状态恢复为 idle（执行完成）
+        thread_after_fix = await thread_manager.get("test_thread_error")
+        assert thread_after_fix.status == ThreadStatus.idle
+
+        messages2 = await queue2.get_all()
+        end_events2 = [msg for msg in messages2 if msg.event == "__stream_end__"]
+        assert len(end_events2) == 1
+        assert end_events2[0].data["status"] == "success"
+
+    @pytest.mark.asyncio
+    async def test_resume_full_graph_after_interrupt(
+        self,
+        executor: GraphExecutor,
+        thread_manager: MemoryThreadsManager,
+        checkpointer_manager: MemoryCheckpointerManager
+    ):
+        """测试完整图中断后恢复执行"""
+        thread = await thread_manager.create(thread_id="test_thread_full")
+
+        # 第一步：执行完整图直到中断
+        graph = create_full_graph()
+        # 直接设置 checkpointer
+        graph.checkpointer = checkpointer_manager.get_checkpointer()
+
+        queue1 = MemoryStreamQueue("queue1")
+        payload1 = RunCreateStateful(  # type: ignore
+            assistant_id="test_assistant",
+            input={
+                "content": "",
+                "auto_accepted": False,  # 会在 hitl 节点中断
+                "not_throw_error": True
+            }
+        )
+
+        await executor.stream_graph(graph, payload1, queue1, "test_thread_full")
+
+        # 验证线程状态为中断
+        thread_after_interrupt = await thread_manager.get("test_thread_full")
+        assert thread_after_interrupt.status == ThreadStatus.interrupted
+
+        # 第二步：恢复执行，继续完成剩余节点
+        queue2 = MemoryStreamQueue("queue2")
+        payload2 = RunCreateStateful(  # type: ignore
+            assistant_id="test_assistant",
+            command=Command(  # type: ignore
+                resume="[APPROVED]"
+            )
+        )
+
+        await executor.stream_graph(graph, payload2, queue2, "test_thread_full")
+
+        # 验证线程状态恢复为 idle
+        thread_after_resume = await thread_manager.get("test_thread_full")
+        assert thread_after_resume.status == ThreadStatus.idle
+
+        messages2 = await queue2.get_all()
+        end_events2 = [msg for msg in messages2 if msg.event == "__stream_end__"]
+        assert len(end_events2) == 1
+        assert end_events2[0].data["status"] == "success"
+
+        # 验证完整流程都执行了（chat -> hitl -> error -> normal）
+        value_events = [msg for msg in messages2 if msg.event == "values"]
+        assert len(value_events) > 0
+        final_state = value_events[-1].data
+        final_content = final_state.get("content", "")
+
+        # 应该包含所有节点的标记
+        assert "[chat]" in final_content
+        assert "[hitl]" in final_content
+        assert "[error]" in final_content
+        assert "[normal]" in final_content
+        assert "[APPROVED]" in final_content
+
+    @pytest.mark.asyncio
+    async def test_resume_with_goto(
+        self,
+        executor: GraphExecutor,
+        thread_manager: MemoryThreadsManager,
+        checkpointer_manager: MemoryCheckpointerManager
+    ):
+        """测试使用 Command.goto 跳转到特定节点恢复执行"""
+        thread = await thread_manager.create(thread_id="test_thread_goto")
+
+        # 第一步：执行图直到中断
+        graph = create_hitl_graph()
+        # 直接设置 checkpointer
+        graph.checkpointer = checkpointer_manager.get_checkpointer()
+
+        queue1 = MemoryStreamQueue("queue1")
+        payload1 = RunCreateStateful(  # type: ignore
+            assistant_id="test_assistant",
+            input={"content": "start", "auto_accepted": False}
+        )
+
+        await executor.stream_graph(graph, payload1, queue1, "test_thread_goto")
+
+        # 验证中断
+        thread_after_interrupt = await thread_manager.get("test_thread_goto")
+        assert thread_after_interrupt.status == ThreadStatus.interrupted
+
+        # 第二步：使用 goto 直接跳转到结束（跳过当前中断节点）
+        queue2 = MemoryStreamQueue("queue2")
+        payload2 = RunCreateStateful(  # type: ignore
+            assistant_id="test_assistant",
+            command=Command(  # type: ignore
+                resume="[REJECTED]",
+                goto="__end__"  # 直接跳转到结束
+            )
+        )
+
+        await executor.stream_graph(graph, payload2, queue2, "test_thread_goto")
+
+        # 验证执行完成
+        thread_after_goto = await thread_manager.get("test_thread_goto")
+        assert thread_after_goto.status == ThreadStatus.idle
+
+        messages2 = await queue2.get_all()
+        end_events2 = [msg for msg in messages2 if msg.event == "__stream_end__"]
+        assert len(end_events2) == 1
+        assert end_events2[0].data["status"] == "success"

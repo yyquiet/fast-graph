@@ -49,8 +49,9 @@ def node_error(state: DemoState):
     """异常中断"""
     content = state.get("content", "")
 
-    if "error" in content:
-        raise RuntimeError("error in content")
+    not_throw_error = state.get("not_throw_error", False)
+    if not not_throw_error:
+        raise RuntimeError("throw_error")
 
     new_content = content + "[error]"
     logger.info(f"[Node error] content: '{content}' -> '{new_content}'")
@@ -64,7 +65,7 @@ def node_normal(state: DemoState):
     logger.info(f"[Node normal] content: '{content}' -> '{new_content}'")
     return {"content": new_content}
 
-def create_graph():
+def create_full_graph():
     """创建图"""
     builder = StateGraph(DemoState)
 
@@ -83,18 +84,41 @@ def create_graph():
 
     return builder.compile()
 
-def create_graph2():
+def create_hitl_graph():
     """创建图"""
     builder = StateGraph(DemoState)
 
     # 添加节点
-    builder.add_node("node_chat", node_chat)
+    builder.add_node("node_hitl", node_hitl)
 
     # 添加边
-    builder.add_edge(START, "node_chat")
-    builder.add_edge("node_chat", END)
+    builder.add_edge(START, "node_hitl")
+    builder.add_edge("node_hitl", END)
 
     return builder.compile()
 
-graph = create_graph()
-graph2 = create_graph2()
+def create_error_graph():
+    """创建图"""
+    builder = StateGraph(DemoState)
+
+    # 添加节点
+    builder.add_node("node_error", node_error)
+
+    # 添加边
+    builder.add_edge(START, "node_error")
+    builder.add_edge("node_error", END)
+
+    return builder.compile()
+
+def create_normal_graph():
+    """创建图"""
+    builder = StateGraph(DemoState)
+
+    # 添加节点
+    builder.add_node("node_normal", node_hitl)
+
+    # 添加边
+    builder.add_edge(START, "node_normal")
+    builder.add_edge("node_normal", END)
+
+    return builder.compile()

@@ -45,8 +45,10 @@ def run_server(host: str = "0.0.0.0", port: int = 8000, reload: bool = True):
 async def register_graphs():
     from graph_demo import graph
     from src.fast_graph.graph.registry import register_graph
-    await register_graph("graph_demo1", graph.graph)
-    await register_graph("graph_demo2", graph.graph2)
+    await register_graph("full_graph", graph.create_full_graph())
+    await register_graph("normal_graph", graph.create_normal_graph())
+    await register_graph("hitl_graph", graph.create_hitl_graph())
+    await register_graph("error_graph", graph.create_error_graph())
 
 
 if __name__ == "__main__":
