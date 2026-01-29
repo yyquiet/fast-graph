@@ -11,6 +11,12 @@ __all__ = [
     "ThreadStatus",
     "Thread",
     "ThreadSearchRequest",
+    "ThreadState",
+    "ThreadStateUpdate",
+    "ThreadStateUpdateResponse",
+    "ThreadStateCheckpointRequest",
+    "ThreadStateSearch",
+    "Task",
     "Config",
     "Send",
     "Command",
@@ -18,4 +24,5 @@ __all__ = [
     "StreamMode",
     "RunCreateStateful",
     "RunCreateStateless",
+    "Interrupt",
 ]

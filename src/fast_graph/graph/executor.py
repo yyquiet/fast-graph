@@ -2,7 +2,7 @@
 LangGraph执行器
 """
 
-from typing import Any, Dict, List, Union
+from typing import Any, Dict, List, Union, Optional
 from langgraph.graph.state import CompiledStateGraph
 
 from ..managers import (
@@ -330,4 +330,83 @@ class GraphExecutor:
         await self.thread_manager.update(
             thread_id,
             {"status": ThreadStatus.error}
+        )
+
+    async def get_state(
+        self,
+        graph: CompiledStateGraph,
+        thread_id: str,
+        checkpoint_id: Optional[str] = None,
+        checkpoint_ns: Optional[str] = None,
+        subgraphs: bool = False
+    ) -> Any:
+        """
+        获取图的当前状态
+
+        Args:
+            graph: 编译后的图
+            thread_id: 线程 ID
+            checkpoint_id: 可选的 checkpoint ID，如果不提供则获取最新状态
+            checkpoint_ns: 可选的 checkpoint 命名空间
+            subgraphs: 是否包含子图状态
+
+        Returns:
+            StateSnapshot 对象，包含当前状态信息
+        """
+        # 构建配置
+        config: Dict[str, Any] = {
+            "configurable": {
+                "thread_id": thread_id,
+            }
+        }
+
+        # 添加 checkpoint 配置
+        if checkpoint_id:
+            config["configurable"]["checkpoint_id"] = checkpoint_id
+        if checkpoint_ns:
+            config["configurable"]["checkpoint_ns"] = checkpoint_ns
+
+        # 获取状态（使用异步方法）
+        return await graph.aget_state(config, subgraphs=subgraphs)  # type: ignore
+
+    async def get_state_history(
+        self,
+        graph: CompiledStateGraph,
+        thread_id: str,
+        checkpoint_ns: Optional[str] = None,
+        filter: Optional[Dict[str, Any]] = None,
+        before: Optional[Dict[str, Any]] = None,
+        limit: Optional[int] = None
+    ) -> Any:
+        """
+        获取图的历史状态
+
+        Args:
+            graph: 编译后的图
+            thread_id: 线程 ID
+            checkpoint_ns: 可选的 checkpoint 命名空间
+            filter: 可选的过滤条件
+            before: 可选的起始配置，用于分页
+            limit: 返回的最大历史记录数
+
+        Returns:
+            AsyncIterator[StateSnapshot]，历史状态的异步迭代器
+        """
+        # 构建配置
+        config: Dict[str, Any] = {
+            "configurable": {
+                "thread_id": thread_id,
+            }
+        }
+
+        # 添加 checkpoint 命名空间
+        if checkpoint_ns:
+            config["configurable"]["checkpoint_ns"] = checkpoint_ns
+
+        # 获取历史状态（使用异步方法）
+        return graph.aget_state_history(
+            config,  # type: ignore
+            filter=filter,
+            before=before,  # type: ignore
+            limit=limit
         )

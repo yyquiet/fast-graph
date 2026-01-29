@@ -877,3 +877,172 @@ class TestGraphExecutorResume:
         end_events2 = [msg for msg in messages2 if msg.event == "__stream_end__"]
         assert len(end_events2) == 1
         assert end_events2[0].data["status"] == "success"
+
+
+class TestGraphExecutorStateAccess:
+    """GraphExecutor 状态访问测试"""
+
+    @pytest.mark.asyncio
+    async def test_get_state(
+        self,
+        executor: GraphExecutor,
+        thread_manager: MemoryThreadsManager,
+        checkpointer_manager: MemoryCheckpointerManager
+    ):
+        """测试获取图的当前状态"""
+        thread = await thread_manager.create(thread_id="test_state_access")
+
+        # 创建并执行图
+        graph = create_normal_graph()
+        graph.checkpointer = checkpointer_manager.get_checkpointer()
+
+        queue = MemoryStreamQueue("queue")
+        payload = RunCreateStateful(  # type: ignore
+            assistant_id="test_assistant",
+            input={"content": "test", "auto_accepted": True, "not_throw_error": True}
+        )
+
+        await executor.stream_graph(graph, payload, queue, "test_state_access")
+
+        # 获取状态
+        state = await executor.get_state(graph, "test_state_access")
+
+        # 验证状态
+        assert state is not None
+        assert state.values is not None
+        assert "content" in state.values
+        assert "[normal]" in state.values["content"]
+
+    @pytest.mark.asyncio
+    async def test_get_state_with_checkpoint(
+        self,
+        executor: GraphExecutor,
+        thread_manager: MemoryThreadsManager,
+        checkpointer_manager: MemoryCheckpointerManager
+    ):
+        """测试获取特定 checkpoint 的状态"""
+        thread = await thread_manager.create(thread_id="test_checkpoint_state")
+
+        # 创建并执行图
+        graph = create_hitl_graph()
+        graph.checkpointer = checkpointer_manager.get_checkpointer()
+
+        queue = MemoryStreamQueue("queue")
+        payload = RunCreateStateful(  # type: ignore
+            assistant_id="test_assistant",
+            input={"content": "test", "auto_accepted": False}  # 会中断
+        )
+
+        await executor.stream_graph(graph, payload, queue, "test_checkpoint_state")
+
+        # 获取当前状态（中断状态）
+        state = await executor.get_state(graph, "test_checkpoint_state")
+
+        # 验证状态
+        assert state is not None
+        assert state.next is not None  # 中断状态应该有 next
+        assert len(state.next) > 0
+
+    @pytest.mark.asyncio
+    async def test_get_state_history(
+        self,
+        executor: GraphExecutor,
+        thread_manager: MemoryThreadsManager,
+        checkpointer_manager: MemoryCheckpointerManager
+    ):
+        """测试获取图的历史状态"""
+        thread = await thread_manager.create(thread_id="test_history")
+
+        # 创建并执行图
+        graph = create_normal_graph()
+        graph.checkpointer = checkpointer_manager.get_checkpointer()
+
+        queue = MemoryStreamQueue("queue")
+        payload = RunCreateStateful(  # type: ignore
+            assistant_id="test_assistant",
+            input={"content": "test", "auto_accepted": True, "not_throw_error": True}
+        )
+
+        await executor.stream_graph(graph, payload, queue, "test_history")
+
+        # 获取历史状态
+        history_iterator = await executor.get_state_history(graph, "test_history")
+        history = []
+        async for snapshot in history_iterator:
+            history.append(snapshot)
+
+        # 验证历史记录
+        assert len(history) > 0
+        # 第一个应该是最新的状态
+        latest_state = history[0]
+        assert latest_state.values is not None
+        assert "content" in latest_state.values
+
+    @pytest.mark.asyncio
+    async def test_get_state_history_with_limit(
+        self,
+        executor: GraphExecutor,
+        thread_manager: MemoryThreadsManager,
+        checkpointer_manager: MemoryCheckpointerManager
+    ):
+        """测试获取限制数量的历史状态"""
+        thread = await thread_manager.create(thread_id="test_history_limit")
+
+        # 创建并执行图
+        graph = create_normal_graph()
+        graph.checkpointer = checkpointer_manager.get_checkpointer()
+
+        queue = MemoryStreamQueue("queue")
+        payload = RunCreateStateful(  # type: ignore
+            assistant_id="test_assistant",
+            input={"content": "test", "auto_accepted": True, "not_throw_error": True}
+        )
+
+        await executor.stream_graph(graph, payload, queue, "test_history_limit")
+
+        # 获取限制数量的历史状态
+        history_iterator = await executor.get_state_history(graph, "test_history_limit", limit=2)
+        history = []
+        async for snapshot in history_iterator:
+            history.append(snapshot)
+
+        # 验证历史记录数量
+        assert len(history) <= 2
+        assert len(history) > 0
+
+    @pytest.mark.asyncio
+    async def test_get_state_after_interrupt(
+        self,
+        executor: GraphExecutor,
+        thread_manager: MemoryThreadsManager,
+        checkpointer_manager: MemoryCheckpointerManager
+    ):
+        """测试中断后获取状态"""
+        thread = await thread_manager.create(thread_id="test_state_interrupt")
+
+        # 创建并执行图直到中断
+        graph = create_hitl_graph()
+        graph.checkpointer = checkpointer_manager.get_checkpointer()
+
+        queue = MemoryStreamQueue("queue")
+        payload = RunCreateStateful(  # type: ignore
+            assistant_id="test_assistant",
+            input={"content": "test", "auto_accepted": False}  # 会中断
+        )
+
+        await executor.stream_graph(graph, payload, queue, "test_state_interrupt")
+
+        # 获取中断后的状态
+        state = await executor.get_state(graph, "test_state_interrupt")
+
+        # 验证状态包含中断信息
+        assert state is not None
+        assert state.next is not None
+        assert len(state.next) > 0  # 应该有待执行的节点
+
+        # 验证历史记录
+        history_iterator = await executor.get_state_history(graph, "test_state_interrupt")
+        history = []
+        async for snapshot in history_iterator:
+            history.append(snapshot)
+        assert len(history) > 0

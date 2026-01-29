@@ -62,6 +62,11 @@ class StreamMode(Enum):
     custom = 'custom'
 
 
+class Interrupt(BaseModel):
+    id: Optional[str] = None
+    value: Dict[str, Any]
+
+
 class RunCreateStateful(BaseModel):
     assistant_id: str = Field(
         ...,
