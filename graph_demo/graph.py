@@ -115,7 +115,7 @@ def create_normal_graph():
     builder = StateGraph(DemoState)
 
     # 添加节点
-    builder.add_node("node_normal", node_hitl)
+    builder.add_node("node_normal", node_normal)
 
     # 添加边
     builder.add_edge(START, "node_normal")

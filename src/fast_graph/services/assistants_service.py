@@ -53,6 +53,8 @@ class AssistantsService:
 
         return results
 
+    async def get_by_id(self, assistant_id: str) -> Optional[Assistant]:
+        return self.assistants.get(assistant_id)
 
     async def get_assistant_graph(
         self, assistant_id: str, xray: Union[bool, int]
