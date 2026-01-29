@@ -9,6 +9,7 @@ from langgraph.graph import StateGraph
 from .api import api_router
 from .errors import ValidationError, ResourceNotFoundError
 from .global_config import GlobalConfig
+from .services import AssistantsService
 
 
 logger = logging.getLogger(__name__)
@@ -40,6 +41,8 @@ async def _init_app_resources(
         graph_dict = graph_factory()
         for graph_id, graph in graph_dict.items():
             await register_graph(graph_id, graph)
+    # 初始化assistants，必需在图注册之后
+    AssistantsService().init()
 
 
 async def _cleanup_app_resources() -> None:
