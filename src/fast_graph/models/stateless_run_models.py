@@ -4,7 +4,7 @@ Stateless Run 相关的数据模型
 from typing import List, Optional, Union, Dict, Any
 from pydantic import BaseModel, Field
 
-from .run_models import Config, StreamMode, Command
+from .run_models import Config, StreamMode
 
 
 class RunCreateStateless(BaseModel):
@@ -18,9 +18,6 @@ class RunCreateStateless(BaseModel):
         description='The assistant ID or graph name to run.',
     )
     input: Optional[Union[Dict[str, Any], List, str, float, bool]] = Field(
-        None, description='The input to the graph.', title='Input'
-    )
-    command: Optional[Command] = Field(
         None, description='The input to the graph.', title='Input'
     )
     config: Optional[Config] = Field(
