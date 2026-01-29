@@ -121,3 +121,22 @@ class BaseThreadsManager(ABC):
             ResourceNotFoundError: 如果未找到线程。
         """
         pass
+
+    @abstractmethod
+    async def acquire_lock(self, thread_id: str) -> bool:
+        """
+        原子地尝试获取线程锁（将状态从非 busy 改为 busy）
+
+        这是一个原子操作，用于并发控制。
+        只有当线程状态不是 busy 时才会成功。
+
+        Args:
+            thread_id: 线程标识符
+
+        Returns:
+            bool: 如果成功获取锁返回 True，否则返回 False
+
+        Raises:
+            ResourceNotFoundError: 如果未找到线程。
+        """
+        pass

@@ -7,6 +7,7 @@
 from datetime import datetime
 from typing import Optional, List, Dict, Any
 import uuid
+import asyncio
 
 from .base_threads_manager import BaseThreadsManager
 from ..models import Thread, ThreadStatus
@@ -25,6 +26,7 @@ class MemoryThreadsManager(BaseThreadsManager):
         """初始化内存线程管理器"""
         self._threads: Dict[str, Thread] = {}
         self._initialized = False
+        self._lock = asyncio.Lock()  # 用于保护并发访问
 
     async def setup(self) -> None:
         """
@@ -55,31 +57,32 @@ class MemoryThreadsManager(BaseThreadsManager):
         Raises:
             ResourceExistsError: 如果线程已存在且 if_exists='raise'
         """
-        # 生成或使用提供的 thread_id
-        if thread_id is None:
-            thread_id = str(uuid.uuid4())
+        async with self._lock:  # 使用锁保护创建操作
+            # 生成或使用提供的 thread_id
+            if thread_id is None:
+                thread_id = str(uuid.uuid4())
 
-        # 检查线程是否已存在
-        if thread_id in self._threads:
-            if if_exists == "do_nothing":
-                return self._threads[thread_id]
-            else:
-                raise ResourceExistsError(f"Thread {thread_id} already exists")
+            # 检查线程是否已存在
+            if thread_id in self._threads:
+                if if_exists == "do_nothing":
+                    return self._threads[thread_id]
+                else:
+                    raise ResourceExistsError(f"Thread {thread_id} already exists")
 
-        # 创建新线程
-        now = datetime.now()
-        thread = Thread(
-            thread_id=thread_id,
-            created_at=now,
-            updated_at=now,
-            metadata=metadata or {},
-            status=ThreadStatus.idle
-        )
+            # 创建新线程
+            now = datetime.now()
+            thread = Thread(
+                thread_id=thread_id,
+                created_at=now,
+                updated_at=now,
+                metadata=metadata or {},
+                status=ThreadStatus.idle
+            )
 
-        # 存储线程
-        self._threads[thread_id] = thread
+            # 存储线程
+            self._threads[thread_id] = thread
 
-        return thread
+            return thread
 
     async def get(self, thread_id: str) -> Thread:
         """
@@ -161,24 +164,25 @@ class MemoryThreadsManager(BaseThreadsManager):
         Raises:
             ResourceNotFoundError: 如果未找到线程。
         """
-        if thread_id not in self._threads:
-            raise ResourceNotFoundError(f"Thread {thread_id} not found")
+        async with self._lock:  # 使用锁保护更新操作
+            if thread_id not in self._threads:
+                raise ResourceNotFoundError(f"Thread {thread_id} not found")
 
-        thread = self._threads[thread_id]
+            thread = self._threads[thread_id]
 
-        # 更新字段
-        if "status" in updates:
-            thread.status = updates["status"]
+            # 更新字段
+            if "status" in updates:
+                thread.status = updates["status"]
 
-        if "metadata" in updates:
-            # 合并元数据
-            if isinstance(updates["metadata"], dict):
-                thread.metadata.update(updates["metadata"])
-            else:
-                thread.metadata = updates["metadata"]
+            if "metadata" in updates:
+                # 合并元数据
+                if isinstance(updates["metadata"], dict):
+                    thread.metadata.update(updates["metadata"])
+                else:
+                    thread.metadata = updates["metadata"]
 
-        # 更新时间戳
-        thread.updated_at = datetime.now()
+            # 更新时间戳
+            thread.updated_at = datetime.now()
 
     async def delete(self, thread_id: str) -> None:
         """
@@ -190,10 +194,11 @@ class MemoryThreadsManager(BaseThreadsManager):
         Raises:
             ResourceNotFoundError: 如果未找到线程。
         """
-        if thread_id not in self._threads:
-            raise ResourceNotFoundError(f"Thread {thread_id} not found")
+        async with self._lock:  # 使用锁保护删除操作
+            if thread_id not in self._threads:
+                raise ResourceNotFoundError(f"Thread {thread_id} not found")
 
-        del self._threads[thread_id]
+            del self._threads[thread_id]
 
     def clear(self) -> None:
         """
@@ -213,3 +218,34 @@ class MemoryThreadsManager(BaseThreadsManager):
             线程总数
         """
         return len(self._threads)
+
+    async def acquire_lock(self, thread_id: str) -> bool:
+        """
+        原子地尝试获取线程锁（将状态从非 busy 改为 busy）
+
+        使用 asyncio.Lock 确保在异步环境下的原子性。
+        只有当线程状态不是 busy 时才会成功。
+
+        Args:
+            thread_id: 线程标识符
+
+        Returns:
+            bool: 如果成功获取锁返回 True，否则返回 False
+
+        Raises:
+            ResourceNotFoundError: 如果未找到线程。
+        """
+        async with self._lock:  # 使用锁保护整个检查-更新操作
+            if thread_id not in self._threads:
+                raise ResourceNotFoundError(f"Thread {thread_id} not found")
+
+            thread = self._threads[thread_id]
+
+            # 原子检查并更新
+            if thread.status == ThreadStatus.busy:
+                return False
+
+            # 更新状态为 busy
+            thread.status = ThreadStatus.busy
+            thread.updated_at = datetime.now()
+            return True

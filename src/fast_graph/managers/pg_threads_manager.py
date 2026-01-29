@@ -97,38 +97,55 @@ class PostgresThreadsManager(BaseThreadsManager):
 
         async with self.async_session() as session:
             async with session.begin():
-                # 检查线程是否存在
-                result = await session.execute(
-                    select(ThreadModel).where(ThreadModel.thread_id == thread_id)
-                )
-                existing = result.scalar_one_or_none()
+                if if_exists == 'do_nothing':
+                    # 使用 INSERT ... ON CONFLICT DO NOTHING 实现原子的"获取或创建"
+                    # 这比先 SELECT 再 INSERT 更安全
+                    from sqlalchemy.dialects.postgresql import insert
 
-                if existing:
-                    if if_exists == 'raise':
+                    stmt = insert(ThreadModel).values(
+                        thread_id=thread_id,
+                        created_at=now,
+                        updated_at=now,
+                        metadata_=metadata,
+                        status='idle',
+                    ).on_conflict_do_nothing(index_elements=['thread_id'])
+
+                    await session.execute(stmt)
+
+                    # 获取线程（可能是刚创建的，也可能是已存在的）
+                    result = await session.execute(
+                        select(ThreadModel).where(ThreadModel.thread_id == thread_id)
+                    )
+                    thread_model = result.scalar_one()
+                    return self._to_thread(thread_model)
+                else:
+                    # if_exists == 'raise' 或其他值
+                    # 检查线程是否存在
+                    result = await session.execute(
+                        select(ThreadModel).where(ThreadModel.thread_id == thread_id)
+                    )
+                    existing = result.scalar_one_or_none()
+
+                    if existing:
                         raise ResourceExistsError(f"Thread {thread_id} already exists")
-                    elif if_exists == 'do_nothing':
-                        return self._to_thread(existing)
-                    else:
-                        # 默认 raise
-                        raise ResourceExistsError(f"Thread {thread_id} already exists")
 
-                # 创建新线程
-                thread_model = ThreadModel(
-                    thread_id=thread_id,
-                    created_at=now,
-                    updated_at=now,
-                    metadata_=metadata,  # 使用 metadata_
-                    status='idle',
-                )
-                session.add(thread_model)
+                    # 创建新线程
+                    thread_model = ThreadModel(
+                        thread_id=thread_id,
+                        created_at=now,
+                        updated_at=now,
+                        metadata_=metadata,
+                        status='idle',
+                    )
+                    session.add(thread_model)
 
-        return Thread(
-            thread_id=thread_id,
-            created_at=now,
-            updated_at=now,
-            metadata=metadata,
-            status=ThreadStatus.idle,
-        )
+                    return Thread(
+                        thread_id=thread_id,
+                        created_at=now,
+                        updated_at=now,
+                        metadata=metadata,
+                        status=ThreadStatus.idle,
+                    )
 
     async def get(self, thread_id: str) -> Thread:
         """通过 ID 检索线程"""
@@ -227,3 +244,48 @@ class PostgresThreadsManager(BaseThreadsManager):
                 await session.execute(
                     delete(ThreadModel).where(ThreadModel.thread_id == thread_id)
                 )
+
+    async def acquire_lock(self, thread_id: str) -> bool:
+        """
+        原子地尝试获取线程锁（将状态从非 busy 改为 busy）
+
+        使用数据库的原子 UPDATE 操作确保并发安全。
+        只有当线程状态不是 busy 时才会成功更新。
+
+        Args:
+            thread_id: 线程标识符
+
+        Returns:
+            bool: 如果成功获取锁返回 True，否则返回 False
+
+        Raises:
+            ResourceNotFoundError: 如果未找到线程。
+        """
+        async with self.async_session() as session:
+            async with session.begin():
+                # 首先检查线程是否存在
+                result = await session.execute(
+                    select(ThreadModel).where(ThreadModel.thread_id == thread_id)
+                )
+                thread_model = result.scalar_one_or_none()
+
+                if not thread_model:
+                    raise ResourceNotFoundError(f"Thread {thread_id} not found")
+
+                # 原子更新：只有当状态不是 busy 时才更新
+                result = await session.execute(
+                    update(ThreadModel)
+                    .where(
+                        and_(
+                            ThreadModel.thread_id == thread_id,
+                            ThreadModel.status != 'busy'
+                        )
+                    )
+                    .values(
+                        status='busy',
+                        updated_at=datetime.now()
+                    )
+                )
+
+                # 检查是否有行被更新
+                return result.rowcount > 0  # type: ignore
