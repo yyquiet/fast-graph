@@ -3,7 +3,6 @@ GraphExecutor 测试类
 """
 
 import pytest
-from unittest.mock import AsyncMock
 
 from typing import AsyncGenerator
 from src.fast_graph.graph.executor import GraphExecutor
@@ -11,7 +10,6 @@ from src.fast_graph.managers import (
     MemoryThreadsManager,
     MemoryStreamQueue,
     MemoryCheckpointerManager,
-    EventMessage,
 )
 from src.fast_graph.models import (
     RunCreateStateful,
@@ -212,7 +210,7 @@ class TestGraphExecutor:
         await thread_manager.create(thread_id="test_thread")
 
         event = ("updates", {"node": "data"})
-        await executor._handle_event(event, queue, "test_thread")
+        await executor._handle_event(event, queue)
 
         messages = await queue.get_all()
         assert len(messages) == 1
@@ -230,7 +228,7 @@ class TestGraphExecutor:
         await thread_manager.create(thread_id="test_thread")
 
         event = ("namespace_1", "values", {"state": "data"})
-        await executor._handle_event(event, queue, "test_thread")
+        await executor._handle_event(event, queue)
 
         messages = await queue.get_all()
         assert len(messages) == 1
@@ -249,7 +247,7 @@ class TestGraphExecutor:
         await thread_manager.create(thread_id="test_thread")
 
         event = {"simple": "data"}
-        await executor._handle_event(event, queue, "test_thread")
+        await executor._handle_event(event, queue)
 
         messages = await queue.get_all()
         assert len(messages) == 1
@@ -268,7 +266,7 @@ class TestGraphExecutor:
 
         # 发送中断事件
         event = ("updates", {"__interrupt__": [{"value": "interrupt_data"}]})
-        thread_interrupted = await executor._handle_event(event, queue, "test_thread")
+        thread_interrupted = await executor._handle_event(event, queue)
 
         # 验证返回值表示检测到中断
         assert thread_interrupted is True
@@ -517,7 +515,7 @@ class TestGraphExecutorEdgeCases:
         await thread_manager.create(thread_id="test_thread")
 
         event = ("values", None)
-        await executor._handle_event(event, queue, "test_thread")
+        await executor._handle_event(event, queue)
 
         messages = await queue.get_all()
         assert len(messages) == 1
@@ -582,8 +580,8 @@ class TestGraphExecutorEdgeCases:
         event1 = ("updates", {"__interrupt__": [{"value": "interrupt1"}]})
         event2 = ("updates", {"__interrupt__": [{"value": "interrupt2"}]})
 
-        interrupted1 = await executor._handle_event(event1, queue, "test_thread")
-        interrupted2 = await executor._handle_event(event2, queue, "test_thread")
+        interrupted1 = await executor._handle_event(event1, queue)
+        interrupted2 = await executor._handle_event(event2, queue)
 
         # 验证两次都检测到中断
         assert interrupted1 is True

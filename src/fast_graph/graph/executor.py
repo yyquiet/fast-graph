@@ -7,7 +7,6 @@ from langgraph.graph.state import CompiledStateGraph
 
 from ..managers import (
     BaseThreadsManager,
-    BaseCheckpointerManager,
     BaseStreamQueue,
     EventMessage,
 )
@@ -86,7 +85,7 @@ class GraphExecutor:
                 subgraphs=payload.stream_subgraphs or False,
                 context=payload.context  # type: ignore
             ):
-                if await self._handle_event(event, queue, thread_id):
+                if await self._handle_event(event, queue):
                     thread_interrupted = True
 
             # 检查执行结果并更新状态
@@ -214,7 +213,6 @@ class GraphExecutor:
         self,
         event: Any,
         queue: BaseStreamQueue,
-        thread_id: str,
     ) -> bool:
         """
         处理图执行事件
@@ -222,7 +220,6 @@ class GraphExecutor:
         Args:
             event: 图执行产生的事件
             queue: 事件队列
-            thread_id: 线程 ID
 
         Returns:
             是否检测到中断事件
