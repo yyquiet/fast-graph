@@ -211,7 +211,7 @@ class TestStatelessGraphExecutor:
         # 验证推送了错误事件
         messages = await queue.get_all()
         assert len(messages) == 1
-        assert messages[0].event == "__stream_error__"
+        assert messages[0].event == "error"
         assert messages[0].data["error"] == "Test error"
         assert messages[0].data["type"] == "ValueError"
 
@@ -224,6 +224,7 @@ class TestStatelessGraphExecutor:
         """测试成功执行图流"""
         # 使用实际的普通图（不会抛异常，不会中断）
         graph = create_normal_graph()
+        graph = graph.compile()
 
         # 创建 payload
         payload = RunCreateStateless(  # type: ignore
@@ -250,6 +251,7 @@ class TestStatelessGraphExecutor:
         """测试执行图时发生错误"""
         # 使用实际的错误图（会抛出 RuntimeError）
         graph = create_error_graph()
+        graph = graph.compile()
 
         payload = RunCreateStateless(  # type: ignore
             assistant_id="test_assistant",
@@ -262,7 +264,7 @@ class TestStatelessGraphExecutor:
 
         # 验证推送了错误事件
         messages = await queue.get_all()
-        error_events = [msg for msg in messages if msg.event == "__stream_error__"]
+        error_events = [msg for msg in messages if msg.event == "error"]
         assert len(error_events) == 1
         assert "throw_error" in error_events[0].data["error"]
 
@@ -275,6 +277,7 @@ class TestStatelessGraphExecutor:
         """测试带 context 的图执行"""
         # 使用实际的普通图
         graph = create_normal_graph()
+        graph = graph.compile()
 
         payload = RunCreateStateless(  # type: ignore
             assistant_id="test_assistant",
@@ -298,6 +301,7 @@ class TestStatelessGraphExecutor:
         """测试带子图的图执行"""
         # 使用实际的完整图
         graph = create_full_graph()
+        graph = graph.compile()
 
         payload = RunCreateStateless(  # type: ignore
             assistant_id="test_assistant",
@@ -320,6 +324,7 @@ class TestStatelessGraphExecutor:
     ):
         """测试使用多个流模式执行图"""
         graph = create_normal_graph()
+        graph = graph.compile()
 
         payload = RunCreateStateless(  # type: ignore
             assistant_id="test_assistant",
@@ -403,6 +408,7 @@ class TestStatelessGraphExecutorEdgeCases:
     ):
         """测试使用空配置执行图"""
         graph = create_normal_graph()
+        graph = graph.compile()
 
         payload = RunCreateStateless(  # type: ignore
             assistant_id="test_assistant",
@@ -425,6 +431,7 @@ class TestStatelessGraphExecutorEdgeCases:
     ):
         """测试带标签的图执行"""
         graph = create_normal_graph()
+        graph = graph.compile()
 
         payload = RunCreateStateless(  # type: ignore
             assistant_id="test_assistant",
@@ -483,6 +490,7 @@ class TestStatelessGraphExecutorStatelessBehavior:
     ):
         """测试多次执行是相互独立的"""
         graph = create_normal_graph()
+        graph = graph.compile()
 
         # 第一次执行
         queue1 = MemoryStreamQueue("queue1")
@@ -525,6 +533,7 @@ class TestStatelessGraphExecutorStatelessBehavior:
     ):
         """测试运行之间不保存状态"""
         graph = create_normal_graph()
+        graph = graph.compile()
 
         # 第一次执行
         queue1 = MemoryStreamQueue("queue1")
@@ -562,6 +571,7 @@ class TestStatelessGraphExecutorStatelessBehavior:
         import asyncio
 
         graph = create_normal_graph()
+        graph = graph.compile()
 
         # 创建多个并发执行任务
         async def run_graph(index: int):

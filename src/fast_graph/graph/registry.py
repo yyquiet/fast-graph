@@ -1,4 +1,4 @@
-from typing import Dict, Optional, Union
+from typing import Dict, Optional
 from langgraph.graph.state import CompiledStateGraph
 from langgraph.graph import StateGraph
 from langchain_core.runnables.config import (
@@ -7,12 +7,12 @@ from langchain_core.runnables.config import (
 
 
 # 全局图注册表
-GRAPHS: Dict[str, Union[StateGraph, CompiledStateGraph]] = {}
+GRAPHS: Dict[str, StateGraph] = {}
 
 
 async def register_graph(
     graph_id: str,
-    graph: Union[StateGraph, CompiledStateGraph]
+    graph: StateGraph
 ) -> None:
     """
     注册图到全局注册表
@@ -31,20 +31,22 @@ async def get_graph(
     """
     获取已注册的图实例
 
+    每次调用都会重新编译图，返回独立的实例，避免状态污染
+
     Args:
         graph_id: 图的唯一标识符
         config: 运行配置
 
     Returns:
-        编译后的图实例
+        编译后的图实例（每次都是新实例）
     """
     if graph_id not in GRAPHS:
         return None
 
-    compiled = GRAPHS[graph_id]
-    if isinstance(compiled, StateGraph):
-        compiled = compiled.compile()
+    state_graph = GRAPHS[graph_id]
 
+    # 每次都重新编译，确保返回独立的图实例
+    compiled = state_graph.compile()
     compiled.config = config
 
     return compiled

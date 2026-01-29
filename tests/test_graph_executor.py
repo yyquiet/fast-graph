@@ -333,7 +333,7 @@ class TestGraphExecutor:
         # 验证推送了错误事件
         messages = await queue.get_all()
         assert len(messages) == 1
-        assert messages[0].event == "__stream_error__"
+        assert messages[0].event == "error"
         assert messages[0].data["error"] == "Test error"
         assert messages[0].data["type"] == "ValueError"
 
@@ -354,6 +354,7 @@ class TestGraphExecutor:
 
         # 使用实际的普通图（不会抛异常，不会中断）
         graph = create_normal_graph()
+        graph = graph.compile()
 
         # 为图配置 checkpointer
         graph.checkpointer = checkpointer_manager.get_checkpointer()
@@ -387,6 +388,7 @@ class TestGraphExecutor:
 
         # 使用实际的错误图（会抛出 RuntimeError）
         graph = create_error_graph()
+        graph = graph.compile()
 
         # 为图配置 checkpointer
         graph.checkpointer = checkpointer_manager.get_checkpointer()
@@ -402,7 +404,7 @@ class TestGraphExecutor:
 
         # 验证推送了错误事件
         messages = await queue.get_all()
-        error_events = [msg for msg in messages if msg.event == "__stream_error__"]
+        error_events = [msg for msg in messages if msg.event == "error"]
         assert len(error_events) == 1
         assert "throw_error" in error_events[0].data["error"]
 
@@ -419,6 +421,7 @@ class TestGraphExecutor:
 
         # 使用实际的普通图
         graph = create_normal_graph()
+        graph = graph.compile()
 
         # 为图配置 checkpointer
         graph.checkpointer = checkpointer_manager.get_checkpointer()
@@ -449,6 +452,7 @@ class TestGraphExecutor:
 
         # 使用实际的 HITL 图（会中断等待人工审批）
         graph = create_hitl_graph()
+        graph = graph.compile()
 
         # 为图配置 checkpointer
         graph.checkpointer = checkpointer_manager.get_checkpointer()
@@ -483,6 +487,7 @@ class TestGraphExecutor:
 
         # 使用实际的完整图
         graph = create_full_graph()
+        graph = graph.compile()
 
         # 为图配置 checkpointer
         graph.checkpointer = checkpointer_manager.get_checkpointer()
@@ -513,6 +518,7 @@ class TestGraphExecutor:
 
         # 使用实际的普通图
         graph = create_normal_graph()
+        graph = graph.compile()
         graph.checkpointer = checkpointer_manager.get_checkpointer()
 
         payload = RunCreateStateful(  # type: ignore
@@ -548,6 +554,7 @@ class TestGraphExecutor:
 
         # 使用实际的普通图
         graph = create_normal_graph()
+        graph = graph.compile()
         graph.checkpointer = checkpointer_manager.get_checkpointer()
 
         payload = RunCreateStateful(  # type: ignore
@@ -670,6 +677,7 @@ class TestGraphExecutorResume:
 
         # 第一步：执行图直到中断
         graph = create_hitl_graph()
+        graph = graph.compile()
         # 直接设置 checkpointer
         graph.checkpointer = checkpointer_manager.get_checkpointer()
 
@@ -729,6 +737,7 @@ class TestGraphExecutorResume:
 
         # 第一步：执行会抛出异常的图
         graph = create_error_graph()
+        graph = graph.compile()
         # 直接设置 checkpointer
         graph.checkpointer = checkpointer_manager.get_checkpointer()
 
@@ -778,6 +787,7 @@ class TestGraphExecutorResume:
 
         # 第一步：执行完整图直到中断
         graph = create_full_graph()
+        graph = graph.compile()
         # 直接设置 checkpointer
         graph.checkpointer = checkpointer_manager.get_checkpointer()
 
@@ -842,6 +852,7 @@ class TestGraphExecutorResume:
 
         # 第一步：执行图直到中断
         graph = create_hitl_graph()
+        graph = graph.compile()
         # 直接设置 checkpointer
         graph.checkpointer = checkpointer_manager.get_checkpointer()
 
@@ -894,6 +905,7 @@ class TestGraphExecutorStateAccess:
 
         # 创建并执行图
         graph = create_normal_graph()
+        graph = graph.compile()
         graph.checkpointer = checkpointer_manager.get_checkpointer()
 
         queue = MemoryStreamQueue("queue")
@@ -925,6 +937,7 @@ class TestGraphExecutorStateAccess:
 
         # 创建并执行图
         graph = create_hitl_graph()
+        graph = graph.compile()
         graph.checkpointer = checkpointer_manager.get_checkpointer()
 
         queue = MemoryStreamQueue("queue")
@@ -955,6 +968,7 @@ class TestGraphExecutorStateAccess:
 
         # 创建并执行图
         graph = create_normal_graph()
+        graph = graph.compile()
         graph.checkpointer = checkpointer_manager.get_checkpointer()
 
         queue = MemoryStreamQueue("queue")
@@ -990,6 +1004,7 @@ class TestGraphExecutorStateAccess:
 
         # 创建并执行图
         graph = create_normal_graph()
+        graph = graph.compile()
         graph.checkpointer = checkpointer_manager.get_checkpointer()
 
         queue = MemoryStreamQueue("queue")
@@ -1022,6 +1037,7 @@ class TestGraphExecutorStateAccess:
 
         # 创建并执行图直到中断
         graph = create_hitl_graph()
+        graph = graph.compile()
         graph.checkpointer = checkpointer_manager.get_checkpointer()
 
         queue = MemoryStreamQueue("queue")

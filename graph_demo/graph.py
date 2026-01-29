@@ -82,7 +82,7 @@ def create_full_graph():
     builder.add_edge("node_error", "node_normal")
     builder.add_edge("node_normal", END)
 
-    return builder.compile()
+    return builder
 
 def create_hitl_graph():
     """创建图"""
@@ -95,7 +95,7 @@ def create_hitl_graph():
     builder.add_edge(START, "node_hitl")
     builder.add_edge("node_hitl", END)
 
-    return builder.compile()
+    return builder
 
 def create_error_graph():
     """创建图"""
@@ -108,7 +108,7 @@ def create_error_graph():
     builder.add_edge(START, "node_error")
     builder.add_edge("node_error", END)
 
-    return builder.compile()
+    return builder
 
 def create_normal_graph():
     """创建图"""
@@ -121,4 +121,4 @@ def create_normal_graph():
     builder.add_edge(START, "node_normal")
     builder.add_edge("node_normal", END)
 
-    return builder.compile()
+    return builder

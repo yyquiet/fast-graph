@@ -317,9 +317,9 @@ class GraphExecutor:
             thread_id: 线程 ID
             queue: 事件队列
         """
-        # 推送错误事件
+        # 推送错误事件 - 使用 "error" 作为事件名称以符合 LangGraph 规范
         await queue.push(EventMessage(
-            event="__stream_error__",
+            event="error",
             data={
                 "error": str(error),
                 "type": type(error).__name__

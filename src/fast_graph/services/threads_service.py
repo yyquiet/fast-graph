@@ -104,15 +104,13 @@ class ThreadsService:
         )
 
         # 提取 tasks
-        tasks = None
+        tasks = []  # 默认为空列表而不是 None
         if hasattr(snapshot, 'tasks') and snapshot.tasks:
             from ..models import Interrupt
-            tasks = []
             for task in snapshot.tasks:
-                # 转换 task.interrupts
-                task_interrupts = None
+                # 转换 task.interrupts - 默认为空列表
+                task_interrupts = []
                 if hasattr(task, 'interrupts') and task.interrupts:
-                    task_interrupts = []
                     for interrupt in task.interrupts:
                         # 如果是 LangGraph 的 Interrupt 对象，转换为我们的模型
                         if hasattr(interrupt, 'value'):
@@ -149,7 +147,7 @@ class ThreadsService:
             parent_checkpoint = snapshot.parent_config.get("configurable", {})
 
         # 提取 interrupts
-        interrupts = None
+        interrupts = []  # 默认为空列表而不是 None
         if hasattr(snapshot, 'interrupts') and snapshot.interrupts:
             from ..models import Interrupt
             interrupts = [
