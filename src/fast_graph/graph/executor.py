@@ -50,10 +50,13 @@ class GraphExecutor:
             thread_id: 线程 ID
         """
         try:
-            # 更新线程状态为忙碌
+            # 更新线程状态为忙碌，并记录 assistant_id 到 metadata
             await self.thread_manager.update(
                 thread_id,
-                {"status": ThreadStatus.busy}
+                {
+                    "status": ThreadStatus.busy,
+                    "metadata": {"assistant_id": payload.assistant_id}
+                }
             )
 
             # 推送元数据事件

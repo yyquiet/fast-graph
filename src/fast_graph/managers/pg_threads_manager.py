@@ -212,13 +212,37 @@ class PostgresThreadsManager(BaseThreadsManager):
                 if not thread_model:
                     raise ResourceNotFoundError(f"Thread {thread_id} not found")
 
-                # 准备更新值
-                update_values = updates.copy()
-                update_values['updated_at'] = datetime.now()
+                # 准备更新值 - 从 updates 复制所有字段
+                update_values = {}
 
-                # 如果存在 ThreadStatus 枚举，转换为字符串
-                if 'status' in update_values and isinstance(update_values['status'], ThreadStatus):
-                    update_values['status'] = update_values['status'].value
+                # 处理所有更新字段
+                for key, value in updates.items():
+                    if key == 'status':
+                        # 处理 status - 转换枚举为字符串
+                        if isinstance(value, ThreadStatus):
+                            update_values['status'] = value.value
+                        else:
+                            update_values['status'] = value
+                    elif key == 'metadata':
+                        # 处理 metadata - 需要合并而不是覆盖
+                        if isinstance(value, dict):
+                            # 合并 metadata
+                            current_metadata = thread_model.metadata_
+                            if current_metadata is not None and isinstance(current_metadata, dict):
+                                merged_metadata = {**current_metadata, **value}
+                            else:
+                                merged_metadata = value
+                            update_values['metadata_'] = merged_metadata
+                        else:
+                            # 完全替换
+                            update_values['metadata_'] = value
+                    else:
+                        # 其他字段直接复制
+                        # 注意：如果字段名在数据库中有特殊映射，需要在这里处理
+                        update_values[key] = value
+
+                # 添加更新时间戳
+                update_values['updated_at'] = datetime.now()
 
                 # 执行更新
                 await session.execute(

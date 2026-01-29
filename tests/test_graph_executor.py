@@ -500,6 +500,69 @@ class TestGraphExecutor:
         assert len(messages) >= 2
         assert messages[-1].event == "__stream_end__"
 
+    @pytest.mark.asyncio
+    async def test_assistant_id_saved_to_metadata(
+        self,
+        executor: GraphExecutor,
+        queue: MemoryStreamQueue,
+        thread_manager: MemoryThreadsManager,
+        checkpointer_manager: MemoryCheckpointerManager
+    ):
+        """测试 assistant_id 被保存到线程 metadata 中"""
+        thread = await thread_manager.create(thread_id="test_thread_metadata")
+
+        # 使用实际的普通图
+        graph = create_normal_graph()
+        graph.checkpointer = checkpointer_manager.get_checkpointer()
+
+        payload = RunCreateStateful(  # type: ignore
+            assistant_id="my_test_assistant",
+            input={"content": "", "auto_accepted": True, "not_throw_error": True}
+        )
+
+        await executor.stream_graph(graph, payload, queue, "test_thread_metadata")
+
+        # 验证 assistant_id 被保存到 metadata
+        updated_thread = await thread_manager.get("test_thread_metadata")
+        assert "assistant_id" in updated_thread.metadata
+        assert updated_thread.metadata["assistant_id"] == "my_test_assistant"
+
+    @pytest.mark.asyncio
+    async def test_metadata_merge_not_overwrite(
+        self,
+        executor: GraphExecutor,
+        queue: MemoryStreamQueue,
+        thread_manager: MemoryThreadsManager,
+        checkpointer_manager: MemoryCheckpointerManager
+    ):
+        """测试 metadata 是合并而不是覆盖"""
+        # 创建线程时带有初始 metadata
+        thread = await thread_manager.create(
+            thread_id="test_thread_merge",
+            metadata={"user_id": "123", "session_id": "abc"}
+        )
+
+        # 验证初始 metadata
+        assert thread.metadata["user_id"] == "123"
+        assert thread.metadata["session_id"] == "abc"
+
+        # 使用实际的普通图
+        graph = create_normal_graph()
+        graph.checkpointer = checkpointer_manager.get_checkpointer()
+
+        payload = RunCreateStateful(  # type: ignore
+            assistant_id="my_assistant",
+            input={"content": "", "auto_accepted": True, "not_throw_error": True}
+        )
+
+        await executor.stream_graph(graph, payload, queue, "test_thread_merge")
+
+        # 验证 metadata 被合并，原有字段没有丢失
+        updated_thread = await thread_manager.get("test_thread_merge")
+        assert updated_thread.metadata["assistant_id"] == "my_assistant"  # 新增的
+        assert updated_thread.metadata["user_id"] == "123"  # 原有的保留
+        assert updated_thread.metadata["session_id"] == "abc"  # 原有的保留
+
 
 class TestGraphExecutorEdgeCases:
     """GraphExecutor 边界情况测试"""
