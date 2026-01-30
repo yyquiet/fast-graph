@@ -18,6 +18,7 @@ logger = logging.getLogger(__name__)
 async def _init_app_resources(
     graphs: Optional[Dict[str, StateGraph]] = None,
     graph_factory: Optional[Callable[[], Dict[str, StateGraph]]] = None,
+    app: Optional[FastAPI] = None,
 ) -> None:
     """
     初始化应用资源
@@ -25,6 +26,7 @@ async def _init_app_resources(
     Args:
         graphs: 图字典
         graph_factory: 图工厂函数
+        app: FastAPI 应用实例
     """
     logger.info("应用启动")
 
@@ -41,8 +43,15 @@ async def _init_app_resources(
         graph_dict = graph_factory()
         for graph_id, graph in graph_dict.items():
             await register_graph(graph_id, graph)
+
     # 初始化assistants，必需在图注册之后
     AssistantsService().init()
+
+    # 添加 A2A 路由（在 assistants 初始化之后）
+    if app:
+        from .a2a import setup_a2a_routes
+        setup_a2a_routes(app)
+        logger.info("A2A routes have been set up")
 
 
 async def _cleanup_app_resources() -> None:
@@ -96,18 +105,18 @@ def create_app(
         ```
     """
     @asynccontextmanager
-    async def lifespan(app: FastAPI):
+    async def lifespan(app_instance: FastAPI):
         # 如果有自定义 lifespan，先执行
         if custom_lifespan:
-            async with custom_lifespan(app):
+            async with custom_lifespan(app_instance):
                 # 内部资源初始化
-                await _init_app_resources(graphs, graph_factory)
+                await _init_app_resources(graphs, graph_factory, app_instance)
                 yield
                 # 内部资源清理
                 await _cleanup_app_resources()
         else:
             # 没有自定义 lifespan，直接执行内部逻辑
-            await _init_app_resources(graphs, graph_factory)
+            await _init_app_resources(graphs, graph_factory, app_instance)
             yield
             await _cleanup_app_resources()
 
@@ -147,7 +156,3 @@ def create_app(
     app.include_router(api_router)
 
     return app
-
-
-# 创建默认应用实例（用于向后兼容）
-app = create_app()
