@@ -26,6 +26,10 @@ class Settings(BaseSettings):
     )
 
     # 数据库配置
+    postgre_auto_create_tables: bool = Field(
+        default=True,
+        description="自动创建表"
+    )
     postgre_database_url: str = Field(
         default="",
         description="PostgreSQL 数据库连接 URL"

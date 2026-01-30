@@ -50,7 +50,7 @@ def _build_task_store() -> TaskStore:
         pg_conn = get_pg_connection()
         return DatabaseTaskStore(
             engine=pg_conn.engine,
-            create_table=True,  # 自动创建表
+            create_table=settings.postgre_auto_create_tables,  # 自动创建表
             table_name='a2a_tasks'  # 使用独立的表名
         )
     else:

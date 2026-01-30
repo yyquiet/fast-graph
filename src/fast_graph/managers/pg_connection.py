@@ -48,7 +48,8 @@ class PostgresConnection:
         async with self.engine.begin() as conn:
             # create_all 会自动检查表是否存在
             # 如果表已存在,会跳过创建,不会报错也不会影响数据
-            await conn.run_sync(Base.metadata.create_all)
+            if settings.postgre_auto_create_tables:
+                await conn.run_sync(Base.metadata.create_all)
 
     async def close(self) -> None:
         """关闭数据库连接"""
