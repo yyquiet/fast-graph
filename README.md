@@ -210,7 +210,7 @@ curl -X POST "http://localhost:8000/a2a/my_graph" \
 
 ## 📡 API 接口
 
-FastGraph 提供了完整的 RESTful API，与 LangGraph 官方 API 兼容。
+FastGraph 提供了简洁的 RESTful API。
 
 ### Assistant（图管理）
 
