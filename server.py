@@ -75,4 +75,5 @@ def run_server(host: str = "0.0.0.0", port: int = 8000, reload: bool = True):
 
 
 if __name__ == "__main__":
-    run_server(host="0.0.0.0", port=8000, reload=True)
+    from src.fast_graph.config import settings
+    run_server(host=settings.server_host, port=settings.server_port, reload=True)

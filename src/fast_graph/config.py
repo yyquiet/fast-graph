@@ -16,6 +16,15 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
+    server_host: str = Field(
+        default="localhost",
+        description="服务器主机地址"
+    )
+    server_port: int = Field(
+        default=8000,
+        description="服务器端口号"
+    )
+
     # 数据库配置
     postgre_database_url: str = Field(
         default="",
