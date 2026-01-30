@@ -9,6 +9,7 @@ import uuid
 import asyncio
 import logging
 
+from langgraph.graph.state import CompiledStateGraph
 from fastapi.responses import StreamingResponse
 
 from ..models import (
@@ -19,7 +20,7 @@ from ..models import (
 from ..graph.executor import GraphExecutor
 from ..graph.registry import get_graph
 from ..global_config import GlobalConfig
-from ..managers import EventMessage
+from ..managers import BaseStreamQueue
 from ..errors import GraphNotFoundError, ResourceNotFoundError, ValidationError
 from .assistants_service import AssistantsService
 from .threads_service import ThreadsService
@@ -48,20 +49,20 @@ class RunsService:
         self.assistants_service = AssistantsService()
         self.threads_service = ThreadsService()
 
-    async def create_run_stream(
+    async def execute_run_to_queue(
         self,
         thread_id: str,
         run_data: RunCreateStateful
-    ) -> StreamingResponse:
+    ) -> tuple[BaseStreamQueue, CompiledStateGraph]:
         """
-        在现有线程中创建运行并流式输出结果
+        执行运行并将结果推送到队列
 
         Args:
             thread_id: 线程 ID
             run_data: 运行配置
 
         Returns:
-            StreamingResponse: 流式输出的执行结果
+            tuple: (queue, graph) - 返回队列和图实例，调用方可以监听队列获取执行结果
 
         Raises:
             GraphNotFoundError: 当指定的 assistant_id 对应的图不存在时
@@ -119,9 +120,8 @@ class RunsService:
         async def execute_graph():
             """后台执行图并将结果推送到队列"""
             try:
-                # 锁已经在外面获取了，直接执行图
+                # 执行图
                 await self.executor.stream_graph(graph, run_data, queue, thread_id)
-
             except Exception as e:
                 logger.error(f"执行图时发生错误: {e}", exc_info=True)
             finally:
@@ -131,6 +131,31 @@ class RunsService:
 
         # 启动后台任务
         asyncio.create_task(execute_graph())
+
+        return queue, graph
+
+    async def create_run_stream(
+        self,
+        thread_id: str,
+        run_data: RunCreateStateful
+    ) -> StreamingResponse:
+        """
+        在现有线程中创建运行并流式输出结果
+
+        Args:
+            thread_id: 线程 ID
+            run_data: 运行配置
+
+        Returns:
+            StreamingResponse: 流式输出的执行结果
+
+        Raises:
+            GraphNotFoundError: 当指定的 assistant_id 对应的图不存在时
+            ResourceNotFoundError: 当线程不存在且 if_not_exists='reject' 时
+            ValidationError: 当线程正在运行时（并发控制）
+        """
+        # 执行运行并获取消息队列
+        queue, _ = await self.execute_run_to_queue(thread_id, run_data)
 
         # 返回流式响应
         async def event_stream() -> AsyncGenerator[str, None]:
