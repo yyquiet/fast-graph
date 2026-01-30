@@ -1,6 +1,6 @@
 # FastGraph
 
-> 为你的 LangGraph 应用快速构建 FastAPI 服务
+> 为你的 LangGraph 应用快速构建 Web 代理服务
 
 FastGraph 是一个轻量级工具，让你只需几行代码就能将本地编写的 LangGraph 图转换为完整的 FastAPI 服务，并完美兼容 LangGraph 官方的 `RemoteGraph` 客户端。
 
