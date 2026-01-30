@@ -122,3 +122,16 @@ def create_normal_graph():
     builder.add_edge("node_normal", END)
 
     return builder
+
+def create_chat_graph():
+    """创建图"""
+    builder = StateGraph(DemoState)
+
+    # 添加节点
+    builder.add_node("node_chat", node_chat)
+
+    # 添加边
+    builder.add_edge(START, "node_chat")
+    builder.add_edge("node_chat", END)
+
+    return builder

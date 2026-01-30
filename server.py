@@ -21,6 +21,7 @@ def create_graphs():
 
     return {
         "full_graph": graph.create_full_graph(),
+        "chat_graph": graph.create_chat_graph(),
         "normal_graph": graph.create_normal_graph(),
         "hitl_graph": graph.create_hitl_graph(),
         "error_graph": graph.create_error_graph(),
