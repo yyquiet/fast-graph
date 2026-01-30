@@ -18,10 +18,11 @@ class AssistantsService:
             with cls._lock:
                 if cls._instance is None:
                     cls._instance = super().__new__(cls)
+                    cls._instance.init()
         return cls._instance
 
     def init(self):
-        """初始化 assistants（只执行一次）"""
+        """初始化 assistants"""
         self.assistants: Dict[str, Assistant] = {}
 
         for graph_id in GRAPHS.keys():

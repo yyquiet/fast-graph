@@ -4,6 +4,7 @@ LangGraph执行器
 
 from typing import Any, Dict, List, Union, Optional
 from langgraph.graph.state import CompiledStateGraph
+from langgraph.types import StateSnapshot
 
 from ..managers import (
     BaseThreadsManager,
@@ -78,7 +79,6 @@ class GraphExecutor:
             graph_input = self._prepare_input(payload)
 
             # 执行图并流式传输事件
-            thread_interrupted = False
             async for event in graph.astream(
                 graph_input,
                 config=config,  # type: ignore
@@ -88,11 +88,11 @@ class GraphExecutor:
                 subgraphs=payload.stream_subgraphs or False,
                 context=payload.context  # type: ignore
             ):
-                if await self._handle_event(event, queue):
-                    thread_interrupted = True
+                await self._handle_event(event, queue)
 
             # 检查执行结果并更新状态
-            await self._finalize_execution(thread_id, thread_interrupted, queue)
+            state = await graph.aget_state(config=config)  # type: ignore
+            await self._finalize_execution(thread_id, state, queue)
 
         except Exception as e:
             # 处理错误
@@ -216,19 +216,14 @@ class GraphExecutor:
         self,
         event: Any,
         queue: BaseStreamQueue,
-    ) -> bool:
+    ):
         """
         处理图执行事件
 
         Args:
             event: 图执行产生的事件
             queue: 事件队列
-
-        Returns:
-            是否检测到中断事件
         """
-        thread_interrupted = False
-
         # 解析事件格式
         namespace = None
         event_type = "values"  # 默认类型
@@ -264,12 +259,10 @@ class GraphExecutor:
             data=message_data
         ))
 
-        return thread_interrupted
-
     async def _finalize_execution(
         self,
         thread_id: str,
-        thread_interrupted: bool,
+        state: StateSnapshot,
         queue: BaseStreamQueue
     ) -> None:
         """
@@ -277,14 +270,14 @@ class GraphExecutor:
 
         Args:
             thread_id: 线程 ID
-            thread_interrupted: 是否检测到中断事件
+            state: 状态
             queue: 事件队列
         """
-        if thread_interrupted:
+        if state.interrupts:
             # 执行被中断
             await queue.push(EventMessage(
                 event="__stream_end__",
-                data={"status": "interrupted"}
+                data={"status": "interrupted", "interrupts": state.interrupts}
             ))
             # 更新线程状态为中断
             await self.thread_manager.update(

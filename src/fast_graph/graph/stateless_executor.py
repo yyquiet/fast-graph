@@ -174,6 +174,8 @@ class StatelessGraphExecutor:
         # else: 单值事件，使用默认的 event_type="values", event_data=event
 
         # 检查是否是中断事件
+        # 没有状态，想要判断是否为__interrupt__，只能通过这种方法，所以event_type必需包含values或者updates
+        # 不过正常情况下，没有状态的graph不应该包含interrupt
         if isinstance(event_data, dict) and "__interrupt__" in event_data:
             thread_interrupted = True
 

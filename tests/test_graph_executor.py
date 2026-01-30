@@ -255,69 +255,6 @@ class TestGraphExecutor:
         assert messages[0].data == {"simple": "data"}
 
     @pytest.mark.asyncio
-    async def test_handle_event_interrupt(
-        self,
-        executor: GraphExecutor,
-        queue: MemoryStreamQueue,
-        thread_manager: MemoryThreadsManager
-    ):
-        """测试处理中断事件"""
-        thread = await thread_manager.create(thread_id="test_thread")
-
-        # 发送中断事件
-        event = ("updates", {"__interrupt__": [{"value": "interrupt_data"}]})
-        thread_interrupted = await executor._handle_event(event, queue)
-
-        # 验证返回值表示检测到中断
-        assert thread_interrupted is True
-
-        # 验证事件已推送
-        messages = await queue.get_all()
-        assert len(messages) == 1
-
-    @pytest.mark.asyncio
-    async def test_finalize_execution_success(
-        self,
-        executor: GraphExecutor,
-        queue: MemoryStreamQueue,
-        thread_manager: MemoryThreadsManager
-    ):
-        """测试成功完成执行"""
-        thread = await thread_manager.create(thread_id="test_thread")
-        await thread_manager.update("test_thread", {"status": ThreadStatus.busy})
-
-        await executor._finalize_execution("test_thread", False, queue)
-
-        # 验证推送了成功结束事件
-        messages = await queue.get_all()
-        assert len(messages) == 1
-        assert messages[0].event == "__stream_end__"
-        assert messages[0].data["status"] == "success"
-
-        # 验证线程状态更新为 idle
-        updated_thread = await thread_manager.get("test_thread")
-        assert updated_thread.status == ThreadStatus.idle
-
-    @pytest.mark.asyncio
-    async def test_finalize_execution_interrupted(
-        self,
-        executor: GraphExecutor,
-        queue: MemoryStreamQueue,
-        thread_manager: MemoryThreadsManager
-    ):
-        """测试中断完成执行"""
-        thread = await thread_manager.create(thread_id="test_thread")
-        await thread_manager.update("test_thread", {"status": ThreadStatus.interrupted})
-
-        await executor._finalize_execution("test_thread", True, queue)
-
-        # 验证推送了中断结束事件
-        messages = await queue.get_all()
-        assert len(messages) == 1
-        assert messages[0].event == "__stream_end__"
-        assert messages[0].data["status"] == "interrupted"
-
-    @pytest.mark.asyncio
     async def test_handle_error(
         self,
         executor: GraphExecutor,
@@ -635,32 +572,6 @@ class TestGraphExecutorEdgeCases:
         config = executor._build_config("thread_123", payload)
 
         assert config["recursion_limit"] == 0
-
-    @pytest.mark.asyncio
-    async def test_multiple_interrupts(
-        self,
-        executor: GraphExecutor,
-        queue: MemoryStreamQueue,
-        thread_manager: MemoryThreadsManager
-    ):
-        """测试多次中断事件"""
-        thread = await thread_manager.create(thread_id="test_thread")
-
-        # 发送多个中断事件
-        event1 = ("updates", {"__interrupt__": [{"value": "interrupt1"}]})
-        event2 = ("updates", {"__interrupt__": [{"value": "interrupt2"}]})
-
-        interrupted1 = await executor._handle_event(event1, queue)
-        interrupted2 = await executor._handle_event(event2, queue)
-
-        # 验证两次都检测到中断
-        assert interrupted1 is True
-        assert interrupted2 is True
-
-        # 验证两个事件都被推送
-        messages = await queue.get_all()
-        assert len(messages) == 2
-
 
 class TestGraphExecutorResume:
     """GraphExecutor 恢复执行测试"""
