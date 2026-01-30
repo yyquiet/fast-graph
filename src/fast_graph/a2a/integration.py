@@ -14,10 +14,12 @@ from fastapi.responses import JSONResponse
 
 from a2a.server.apps.jsonrpc.fastapi_app import A2AFastAPIApplication
 from a2a.server.request_handlers import DefaultRequestHandler
+from a2a.server.tasks.task_store import TaskStore
 from a2a.server.tasks import (
     BasePushNotificationSender,
     InMemoryPushNotificationConfigStore,
     InMemoryTaskStore,
+    DatabaseTaskStore,
 )
 from a2a.types import (
     AgentCapabilities,
@@ -37,6 +39,29 @@ logger = logging.getLogger(__name__)
 
 # 全局存储：assistant_id -> A2A application
 _assistant_apps: Dict[str, A2AFastAPIApplication] = {}
+
+# 全局 TaskStore 实例（所有 assistant 共享）
+_task_store: TaskStore | None = None
+
+def _build_task_store() -> TaskStore:
+    if settings.postgre_database_url:
+        # 获取 PostgreSQL 连接并创建 DatabaseTaskStore
+        from ..managers.pg_connection import get_pg_connection
+        pg_conn = get_pg_connection()
+        return DatabaseTaskStore(
+            engine=pg_conn.engine,
+            create_table=True,  # 自动创建表
+            table_name='a2a_tasks'  # 使用独立的表名
+        )
+    else:
+        return InMemoryTaskStore()
+
+def _get_task_store() -> TaskStore:
+    """获取全局 TaskStore 实例"""
+    global _task_store
+    if _task_store is None:
+        _task_store = _build_task_store()
+    return _task_store
 
 
 def setup_a2a_routes(
@@ -184,7 +209,7 @@ def _create_assistant_app(
     )
     request_handler = DefaultRequestHandler(
         agent_executor=GraphAgentExecutor(assistant_id),
-        task_store=InMemoryTaskStore(),
+        task_store=_get_task_store(),
         push_config_store=push_config_store,
         push_sender=push_sender
     )
